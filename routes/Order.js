@@ -8,10 +8,10 @@ const multerGlobal = require('../middlewares/multerGlobal');
 router.use(isAuth);
 
 // Checkout route
-router.post('/checkout', multerGlobal, orderController.checkout);
+router.get('/checkout', multerGlobal, orderController.checkout);
 
 // Payment verification route
-router.post('/verify-payment', multerGlobal, orderController.verifyPayment);
+// router.post('/verify-payment', multerGlobal, orderController.verifyPayment);
 
 // Temporary test endpoints (remove in production)
 router.get('/payment-callback', multerGlobal, (req, res) => {

@@ -79,6 +79,10 @@ const orderSchema = new Schema(
         min: 0,
         max: 100,
       },
+      discountType: {
+        type: String,
+        enum: ['percentage', 'value'],
+      },
       couponRef: {
         type: Schema.Types.ObjectId,
         ref: 'Coupon',

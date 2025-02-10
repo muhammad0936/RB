@@ -15,6 +15,19 @@ exports.checkout = async (req, res) => {
     const customerId = req.userId;
     const { deliveryAddress, couponCode, isUrgent } = req.body;
 
+    // Validate required fields
+    if (
+      !deliveryAddress ||
+      !deliveryAddress.state ||
+      !deliveryAddress.governorate ||
+      !deliveryAddress.city
+    ) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Delivery address details are required',
+      });
+    }
+
     // 1. Validate Customer
     const customer = await Customer.findById(customerId)
       .populate({
@@ -43,6 +56,7 @@ exports.checkout = async (req, res) => {
         message: 'Invalid location details',
       });
     }
+
     if (
       !state.governorates.some((id) =>
         id.equals(deliveryAddress.governorate)
@@ -72,6 +86,7 @@ exports.checkout = async (req, res) => {
     // 4. Calculate Delivery Cost
     const firstKilo = parseFloat(state.firstKiloDeliveryCost);
     const perKilo = parseFloat(state.deliveryCostPerKilo);
+    console.log(totalWeight, firstKilo, perKilo);
     let deliveryCost =
       firstKilo + Math.ceil(Math.max(0, totalWeight - 1)) * perKilo;
 
@@ -80,12 +95,19 @@ exports.checkout = async (req, res) => {
     let discount = 0;
 
     if (couponCode) {
-      coupon = await Coupon.findOne({ code: couponCode }).populate('validFor');
+      coupon = await Coupon.findOne({ code: couponCode }).lean();
 
-      if (!coupon || coupon.expirationDate < new Date()) {
+      if (!coupon) {
         return res.status(StatusCodes.BAD_REQUEST).json({
           success: false,
-          message: 'Invalid or expired coupon',
+          message: 'Invalid coupon code',
+        });
+      }
+
+      if (new Date(coupon.expirationDate) < new Date()) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: 'Expired coupon',
         });
       }
 
@@ -100,107 +122,39 @@ exports.checkout = async (req, res) => {
       // Calculate discount
       discount =
         coupon.discountType === 'percentage'
-          ? totalProductPrice * (coupon.discountValue / 100)
-          : coupon.discountValue;
+          ? totalProductPrice * (coupon.discount / 100)
+          : coupon.discount;
 
       discount = Math.min(discount, coupon.maxDiscount || Infinity);
     }
-
-    // 6. Create Order
-    const order = new Order({
-      products: cartItems,
-      customer: customerId,
-      deliveryAddress,
-      deliveryCost,
-      totalAmount: totalProductPrice + deliveryCost - discount,
-      coupon: coupon
-        ? {
-            code: coupon.code,
-            discount,
-            couponRef: coupon._id,
-          }
-        : undefined,
-      isUrgent,
-      status: 'pending',
-    });
-
-    // // In your checkout controller
-    // const isTestEnv = process.env.NODE_ENV === 'test';
-    // // 7. Prepare MyFatoorah Payment
-    // const payload = {
-    //   PaymentMethodId: process.env.NODE_ENV === 'test' ? '2' : null,
-    //   CustomerName: customer.name,
-    //   InvoiceAmount: order.totalAmount,
-    //   CurrencyIso: 'KWD',
-    //   CustomerEmail: customer.email || 'no-email@example.com',
-    //   CustomerMobile: customer.phone,
-    //   CallBackUrl: isTestEnv
-    //     ? `${process.env.BACKEND_URL}/payment-callback`
-    //     : `${process.env.FRONTEND_URL}/payment-callback`,
-    //   ErrorUrl: isTestEnv
-    //     ? `${process.env.BACKEND_URL}/payment-error`
-    //     : `${process.env.FRONTEND_URL}/payment-error`,
-    //   Language: 'en',
-    //   CustomerReference: order._id.toString(),
-    //   InvoiceItems: customer.cart.map((item) => ({
-    //     ItemName: item.product.title,
-    //     Quantity: item.quantity,
-    //     UnitPrice: item.product.price,
-    //   })),
-    // };
-
-    // const response = await axios.post(
-    //   `${process.env.MYFATOORAH_BASE_URL}/v2/ExecutePayment`,
-    //   payload,
-    //   {
-    //     headers: {
-    //       Authorization: `Bearer ${process.env.MYFATOORAH_API_KEY}`,
-    //       'Content-Type': 'application/json',
-    //       accept: 'application/json',
-    //     },
-    //   }
-    // );
-    var response = null;
-    var request = require('request');
-    var token = 'Bearer ' + process.env.MYFATOORAH_API_KEY; //token value to be placed here;
-    var baseURL = 'https://apitest.myfatoorah.com';
-    var options = {
-      method: 'POST',
-      url: baseURL + '/v2/InitiatePayment',
-      headers: {
-        Accept: 'application/json',
-        Authorization: 'Bearer ' + token,
-        'Content-Type': 'application/json',
-      },
-      body: { InvoiceAmount: 100, CurrencyIso: 'KWD' },
-      json: true,
-    };
-
-    request(options, function (error, response, body) {
-      if (error) throw new Error(error);
-      response = body;
-      console.log('body ', body);
-    });
-    console.log('response ', response);
-
-    // 8. Finalize Order
-    order.paymentId = response.data.Data.PaymentId;
-    await order.save();
-
-    // Update coupon usage
-    if (coupon) {
-      await Coupon.findByIdAndUpdate(coupon._id, {
-        $inc: { usedCount: 1 },
-      });
-    }
-
+    let totalAmount = 0;
+    totalAmount = totalProductPrice - discount + deliveryCost;
+    console.log(totalAmount);
+    const payload = { InvoiceAmount: 100, CurrencyIso: 'KWD' };
+    const response = await axios.post(
+      `${process.env.MYFATOORAH_BASE_URL}/v2/InitiatePayment`,
+      payload,
+      {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${process.env.MYFATOORAH_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
     res.status(StatusCodes.OK).json({
       success: true,
-      paymentUrl: response.data.Data.PaymentURL,
-      orderId: order._id,
+      // paymentUrl: response.data.Data.PaymentURL,
+      totalProductPrice,
+      productsDisount: 0,
+      discount,
+      discountType: coupon.discountType,
+      deliveryCost,
+      totalAmount,
+      paymentDetails: response.data,
     });
   } catch (error) {
-    console.error(`Checkout Error: ${error}`);
+    console.error(`Checkout Error: ${error.message}`);
 
     const statusCode =
       error.response?.status || StatusCodes.INTERNAL_SERVER_ERROR;
@@ -220,65 +174,222 @@ exports.checkout = async (req, res) => {
   }
 };
 
-exports.verifyPayment = async (req, res) => {
+exports.createOrder = async (req, res) => {
   try {
-    const { paymentId } = req.body;
     const customerId = req.userId;
+    const { deliveryAddress, couponCode, isUrgent } = req.body;
 
-    // 1. Verify payment with MyFatoorah
+    // Validate required fields
+    if (
+      !deliveryAddress ||
+      !deliveryAddress.state ||
+      !deliveryAddress.governorate ||
+      !deliveryAddress.city
+    ) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Delivery address details are required',
+      });
+    }
+
+    // **1. Validate Customer**
+    const customer = await Customer.findById(customerId)
+      .populate({
+        path: 'cart.product',
+        select: 'title price weight',
+      })
+      .lean();
+
+    if (!customer || customer.cart.length === 0) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Invalid customer or empty cart',
+      });
+    }
+
+    // **2. Validate Address Hierarchy**
+    const [state, governorate, city] = await Promise.all([
+      State.findById(deliveryAddress.state).lean(),
+      Governorate.findById(deliveryAddress.governorate).lean(),
+      City.findById(deliveryAddress.city).lean(),
+    ]);
+
+    if (!state || !governorate || !city) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Invalid location details',
+      });
+    }
+
+    if (
+      !state.governorates.some((id) =>
+        id.equals(deliveryAddress.governorate)
+      ) ||
+      !governorate.cities.some((id) => id.equals(deliveryAddress.city))
+    ) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Location hierarchy mismatch',
+      });
+    }
+
+    // **3. Calculate Cart Totals**
+    let totalProductPrice = 0;
+    let totalWeight = 0;
+    const cartItems = customer.cart.map((item) => {
+      totalProductPrice += item.product.price * item.quantity;
+      totalWeight += item.product.weight * item.quantity;
+      return {
+        product: item.product._id,
+        price: item.product.price,
+        size: item.size,
+        quantity: item.quantity,
+        notes: item.notes || '',
+      };
+    });
+
+    // **4. Calculate Delivery Cost**
+    const firstKilo = parseFloat(state.firstKiloDeliveryCost);
+    const perKilo = parseFloat(state.deliveryCostPerKilo);
+    let deliveryCost =
+      firstKilo + Math.ceil(Math.max(0, totalWeight - 1)) * perKilo;
+
+    // **5. Handle Coupon**
+    let discount = 0;
+    let coupon = null;
+
+    if (couponCode) {
+      coupon = await Coupon.findOne({ code: couponCode }).lean();
+
+      if (!coupon) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: 'Invalid coupon code',
+        });
+      }
+
+      if (new Date(coupon.expirationDate) < new Date()) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: 'Expired coupon',
+        });
+      }
+
+      // Validate minimum order amount
+      if (totalProductPrice < coupon.minOrderAmount) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: `Coupon requires minimum order of ${coupon.minOrderAmount}`,
+        });
+      }
+
+      // Calculate discount
+      discount =
+        coupon.discountType === 'percentage'
+          ? totalProductPrice * (coupon.discount / 100)
+          : coupon.discount;
+
+      discount = Math.min(discount, coupon.maxDiscount || Infinity);
+    }
+
+    // **6. Calculate Total Amount**
+    const totalAmount = totalProductPrice - discount + deliveryCost;
+
+    // **7. Prepare Order Data**
+    const orderData = {
+      products: cartItems,
+      customer: customerId,
+      totalAmount,
+      deliveryCost,
+      deliveryAddress,
+      coupon: coupon
+        ? {
+            code: coupon.code,
+            discount: coupon.discount,
+            discountType: coupon.discountType,
+            couponRef: coupon._id,
+          }
+        : undefined,
+      isUrgent: isUrgent || false,
+      isPaid: false,
+      status: 'pending',
+    };
+
+    // **8. Create Order**
+    const order = await Order.create(orderData);
+
+    // **9. Initiate Payment with MyFatoorah**
+    const paymentPayload = {
+      PaymentMethodId: '2', // Update with the correct payment method ID
+      CustomerName: `${customer.firstName} ${customer.lastName}`,
+      DisplayCurrencyIso: 'KWD',
+      MobileCountryCode: '+965',
+      CustomerMobile: customer.mobile || '00000000',
+      CustomerEmail: customer.email || 'email@example.com',
+      InvoiceValue: totalAmount,
+      CallBackUrl: 'https://yourdomain.com/api/payment/callback',
+      ErrorUrl: 'https://yourdomain.com/api/payment/error',
+      Language: 'en',
+      CustomerReference: order._id.toString(),
+      UserDefinedField: 'Order Payment',
+      CustomerAddress: {
+        Block: '',
+        Street: deliveryAddress.street,
+        HouseBuildingNo: deliveryAddress.building.number || '',
+        Address: `${deliveryAddress.city}, ${deliveryAddress.governorate}, ${deliveryAddress.state}`,
+        AddressInstructions: deliveryAddress.notes || '',
+      },
+      InvoiceItems: cartItems.map((item) => ({
+        ItemName: item.product.title || 'Product',
+        Quantity: item.quantity,
+        UnitPrice: item.price,
+      })),
+    };
+
     const response = await axios.post(
-      `${process.env.MYFATOORAH_BASE_URL}/v2/getPaymentStatus`,
-      { PaymentId: paymentId },
+      `${process.env.MYFATOORAH_BASE_URL}/v2/ExecutePayment`,
+      paymentPayload,
       {
         headers: {
+          Accept: 'application/json',
           Authorization: `Bearer ${process.env.MYFATOORAH_API_KEY}`,
           'Content-Type': 'application/json',
         },
       }
     );
 
-    // 2. Find related order
-    const order = await Order.findOne({
-      paymentId,
-      customer: customerId,
-    });
+    const paymentData = response.data;
 
-    if (!order) {
-      return res.status(StatusCodes.NOT_FOUND).json({
-        success: false,
-        message: 'Order not found',
-      });
-    }
-
-    // 3. Update order status if payment successful
-    if (response.data.Data.InvoiceStatus === 'Paid') {
-      order.isPaid = true;
-      order.status = 'processing';
-      await order.save();
-
-      // 4. Clear customer's cart
-      await Customer.findByIdAndUpdate(customerId, { $set: { cart: [] } });
-
-      return res.status(StatusCodes.OK).json({
-        success: true,
-        message: 'Payment verified successfully',
-      });
-    }
-
-    // 5. Handle failed payment
-    order.status = 'failed';
+    // **10. Update Order with Payment ID**
+    order.paymentId = paymentData.Data.PaymentId;
     await order.save();
 
-    res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: 'Payment verification failed',
+    // **11. Clear Customer Cart**
+    await Customer.findByIdAndUpdate(customerId, { cart: [] });
+
+    // **12. Respond with Payment URL**
+    res.status(StatusCodes.OK).json({
+      success: true,
+      paymentUrl: paymentData.Data.PaymentURL,
+      orderId: order._id,
     });
   } catch (error) {
-    console.error(`Payment Verification Error: ${error.message}`);
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+    console.error(`Order Creation Error: ${error.message}`);
+
+    const statusCode =
+      error.response?.status || StatusCodes.INTERNAL_SERVER_ERROR;
+    const message = error.response?.data?.message || 'Failed to create order';
+
+    res.status(statusCode).json({
       success: false,
-      message: 'Payment verification failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      message,
+      error:
+        process.env.NODE_ENV === 'development'
+          ? {
+              stack: error.stack,
+              details: error.response?.data,
+            }
+          : undefined,
     });
   }
 };

@@ -35,6 +35,7 @@ const customerSchema = new Schema(
           type: Number,
           required: true,
         },
+        notes: String,
       },
     ],
     resetToken: String,
