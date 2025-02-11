@@ -72,7 +72,7 @@ router.delete('/city/:id', multerGlobal, isAuth, adminControllers.deleteCity);
 router.post('/coupon', multerGlobal, isAuth, adminControllers.addCoupon);
 
 router.delete(
-  '/coupon/:couponId',
+  '/coupon/:id',
   multerGlobal,
   isAuth,
   adminControllers.deleteCoupon

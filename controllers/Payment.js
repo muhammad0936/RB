@@ -362,7 +362,9 @@ exports.createOrder = async (req, res) => {
 
     // **10. Update Order with Payment ID**
     order.paymentId = paymentData.Data.PaymentId;
+    coupon.usedCount = coupon.usedCount + 1;
     await order.save();
+    await coupon.save();
 
     // **11. Clear Customer Cart**
     await Customer.findByIdAndUpdate(customerId, { cart: [] });
