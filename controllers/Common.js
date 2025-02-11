@@ -287,11 +287,9 @@ exports.getAllStates = async (req, res, next) => {
 exports.getStateByName = async (req, res, next) => {
   try {
     const { name = '' } = req.query;
-    console.log(name);
     const state = await State.findOne({ name }).select(
       '_id name firstKiloDeliveryCost deliveryCostPerKilo'
     );
-    console.log(state);
     if (!state) {
       const error = new Error('State not found');
       error.statusCode = StatusCodes.NOT_FOUND;

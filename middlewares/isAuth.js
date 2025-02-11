@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 module.exports = (req, res, next) => {
   try {
     let token = req.get('Authorization');
-    console.log(token);
     if (!token) {
       const error = new Error('jwt must be provided');
       error.statusCode = 422;

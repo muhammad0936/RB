@@ -15,7 +15,6 @@ router.get('/checkout', multerGlobal, orderController.checkout);
 
 // Temporary test endpoints (remove in production)
 router.get('/payment-callback', multerGlobal, (req, res) => {
-  console.log('Callback Params:', req.query);
   res.status(200).json({
     success: true,
     data: req.query,
@@ -23,7 +22,6 @@ router.get('/payment-callback', multerGlobal, (req, res) => {
 });
 
 router.get('/payment-error', multerGlobal, (req, res) => {
-  console.log('Error Params:', req.query);
   res.status(400).json({
     success: false,
     error: req.query,

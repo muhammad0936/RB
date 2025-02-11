@@ -86,7 +86,6 @@ exports.checkout = async (req, res) => {
     // 4. Calculate Delivery Cost
     const firstKilo = parseFloat(state.firstKiloDeliveryCost);
     const perKilo = parseFloat(state.deliveryCostPerKilo);
-    console.log(totalWeight, firstKilo, perKilo);
     let deliveryCost =
       firstKilo + Math.ceil(Math.max(0, totalWeight - 1)) * perKilo;
 
@@ -129,7 +128,6 @@ exports.checkout = async (req, res) => {
     }
     let totalAmount = 0;
     totalAmount = totalProductPrice - discount + deliveryCost;
-    console.log(totalAmount);
     const payload = { InvoiceAmount: 100, CurrencyIso: 'KWD' };
     const response = await axios.post(
       `${process.env.MYFATOORAH_BASE_URL}/v2/InitiatePayment`,

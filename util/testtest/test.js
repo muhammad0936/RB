@@ -1,4 +1,3 @@
-console.log('#################### Direct Payment ########################');
 var request = require('request');
 var token = 'mytokenvalue'; //token value to be placed here;
 var baseURL = 'https://apitest.myfatoorah.com';
