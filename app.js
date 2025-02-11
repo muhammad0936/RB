@@ -48,13 +48,8 @@ app.use((req, res, next) => {
 app.use('/admin', AdminRoutes);
 app.use('/operator', OperatorRoutes);
 app.use('/customer', CustomerRoutes);
-app.use('/', CommonRoutes);
-app.use('/', OrderRoutes);
-
-app.post('/throwError', (req, res, next) => {
-  const err = new Error(req.body.error);
-  next(err);
-});
+app.use(CommonRoutes);
+app.use(OrderRoutes);
 
 app.use((req, res, next) => {
   if (req.files) {
