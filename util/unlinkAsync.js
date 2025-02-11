@@ -1,3 +1,4 @@
+const unlink = require('./deleteFile');
 const unlinkAsync = (path) => {
   return new Promise((resolve, reject) => {
     unlink(path, (err) => {
