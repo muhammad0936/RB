@@ -11,14 +11,14 @@ router.get('/checkout', multerGlobal, isAuth, orderController.checkout);
 // router.post('/verify-payment', multerGlobal, orderController.verifyPayment);
 
 // Temporary test endpoints (remove in production)
-router.get('/payment-callback', multerGlobal, isAuth, (req, res) => {
+router.get('/payment-callback', multerGlobal, (req, res) => {
   res.status(200).json({
     success: true,
     data: req.query,
   });
 });
 
-router.get('/payment-error', multerGlobal, isAuth, (req, res) => {
+router.get('/payment-error', multerGlobal, (req, res) => {
   res.status(400).json({
     success: false,
     error: req.query,
