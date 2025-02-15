@@ -101,7 +101,7 @@ exports.login = async (req, res, next) => {
 
 exports.addToCart = async (req, res, next) => {
   try {
-    const { productId, size, quantity } = req.body;
+    const { productId, size, quantity, notes = '' } = req.body;
     const customerId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -145,7 +145,10 @@ exports.addToCart = async (req, res, next) => {
 
     // Check if the product is already in the cart
     const existingCartItem = customer.cart.find(
-      (item) => item.product.toString() === productId && +item.size === +size
+      (item) =>
+        item.product.toString() === productId &&
+        +item.size === +size &&
+        item.notes === notes
     );
 
     if (existingCartItem) {
@@ -157,6 +160,7 @@ exports.addToCart = async (req, res, next) => {
         product: productId,
         size,
         quantity,
+        notes,
       });
     }
 
@@ -197,7 +201,7 @@ exports.addToCart = async (req, res, next) => {
 
 exports.removeFromCart = async (req, res, next) => {
   try {
-    const { productId, size } = req.body;
+    const { productId, size, notes } = req.body;
     const customerId = req.userId; // Assuming the customer ID is stored in req.userId after authentication
 
     // Validate input
@@ -223,7 +227,10 @@ exports.removeFromCart = async (req, res, next) => {
 
     // Find the index of the item in the cart
     const itemIndex = customer.cart.findIndex(
-      (item) => item.product.toString() === productId && item.size === +size
+      (item) =>
+        item.product.toString() === productId &&
+        item.size === +size &&
+        item.notes === notes
     );
 
     // Check if the item exists in the cart

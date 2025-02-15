@@ -9,6 +9,7 @@ const State = require('../models/State');
 const Governorate = require('../models/Governorate');
 const City = require('../models/City');
 const Coupon = require('../models/Coupon');
+const { OrderStatus } = require('../util/types');
 
 exports.checkout = async (req, res) => {
   try {
@@ -121,7 +122,7 @@ exports.checkout = async (req, res) => {
       // Calculate discount
       discount =
         coupon.discountType === 'percentage'
-          ? totalProductPrice * (coupon.discount / 100)
+          ? (totalProductPrice * coupon.discount) / 100
           : coupon.discount;
 
       discount = Math.min(discount, coupon.maxDiscount || Infinity);
@@ -171,26 +172,27 @@ exports.checkout = async (req, res) => {
     });
   }
 };
+// controllers/orderController.js
 
 exports.createOrder = async (req, res) => {
+  let tempOrder = null;
   try {
     const customerId = req.userId;
-    const { deliveryAddress, couponCode, isUrgent } = req.body;
-
-    // Validate required fields
+    const { deliveryAddress, notes, couponCode, isUrgent, paymentMethodId } =
+      req.body;
+    // Validation
     if (
-      !deliveryAddress ||
-      !deliveryAddress.state ||
-      !deliveryAddress.governorate ||
-      !deliveryAddress.city
+      !deliveryAddress?.state ||
+      !deliveryAddress?.governorate ||
+      !deliveryAddress?.city
     ) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
-        message: 'Delivery address details are required',
+        message: 'State, governorate, and city are required',
       });
     }
 
-    // **1. Validate Customer**
+    // Get customer with populated cart
     const customer = await Customer.findById(customerId)
       .populate({
         path: 'cart.product',
@@ -198,40 +200,32 @@ exports.createOrder = async (req, res) => {
       })
       .lean();
 
-    if (!customer || customer.cart.length === 0) {
+    if (!customer?.cart?.length) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
         message: 'Invalid customer or empty cart',
       });
     }
 
-    // **2. Validate Address Hierarchy**
+    // Validate address hierarchy
     const [state, governorate, city] = await Promise.all([
-      State.findById(deliveryAddress.state).lean(),
-      Governorate.findById(deliveryAddress.governorate).lean(),
-      City.findById(deliveryAddress.city).lean(),
+      State.findById(deliveryAddress.state),
+      Governorate.findById(deliveryAddress.governorate),
+      City.findById(deliveryAddress.city),
     ]);
 
-    if (!state || !governorate || !city) {
+    const isValidAddress =
+      state?.governorates.some((g) => g.equals(deliveryAddress.governorate)) &&
+      governorate?.cities.some((c) => c.equals(deliveryAddress.city));
+
+    if (!isValidAddress) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
-        message: 'Invalid location details',
+        message: 'Invalid address hierarchy',
       });
     }
 
-    if (
-      !state.governorates.some((id) =>
-        id.equals(deliveryAddress.governorate)
-      ) ||
-      !governorate.cities.some((id) => id.equals(deliveryAddress.city))
-    ) {
-      return res.status(StatusCodes.BAD_REQUEST).json({
-        success: false,
-        message: 'Location hierarchy mismatch',
-      });
-    }
-
-    // **3. Calculate Cart Totals**
+    // Calculate totals
     let totalProductPrice = 0;
     let totalWeight = 0;
     const cartItems = customer.cart.map((item) => {
@@ -246,55 +240,44 @@ exports.createOrder = async (req, res) => {
       };
     });
 
-    // **4. Calculate Delivery Cost**
-    const firstKilo = parseFloat(state.firstKiloDeliveryCost);
-    const perKilo = parseFloat(state.deliveryCostPerKilo);
-    let deliveryCost =
-      firstKilo + Math.ceil(Math.max(0, totalWeight - 1)) * perKilo;
+    // Calculate delivery cost
+    const deliveryCost =
+      parseFloat(state.firstKiloDeliveryCost) +
+      Math.ceil(Math.max(0, totalWeight - 1)) *
+        parseFloat(state.deliveryCostPerKilo);
 
-    // **5. Handle Coupon**
-    let discount = 0;
+    // Handle coupon
     let coupon = null;
-
+    let discount = 0;
     if (couponCode) {
-      coupon = await Coupon.findOne({ code: couponCode }).lean();
-
-      if (!coupon) {
+      coupon = await Coupon.findOne({ code: couponCode });
+      if (!coupon || new Date(coupon.expirationDate) < new Date()) {
         return res.status(StatusCodes.BAD_REQUEST).json({
           success: false,
-          message: 'Invalid coupon code',
+          message: 'Invalid or expired coupon',
         });
       }
-
-      if (new Date(coupon.expirationDate) < new Date()) {
-        return res.status(StatusCodes.BAD_REQUEST).json({
-          success: false,
-          message: 'Expired coupon',
-        });
-      }
-
-      // Validate minimum order amount
       if (totalProductPrice < coupon.minOrderAmount) {
         return res.status(StatusCodes.BAD_REQUEST).json({
           success: false,
-          message: `Coupon requires minimum order of ${coupon.minOrderAmount}`,
+          message: `Minimum order amount ${coupon.minOrderAmount} required`,
         });
       }
-
-      // Calculate discount
       discount =
         coupon.discountType === 'percentage'
-          ? totalProductPrice * (coupon.discount / 100)
+          ? Math.min(
+              totalProductPrice * (coupon.discount / 100),
+              coupon.maxDiscount || Infinity
+            )
           : coupon.discount;
-
-      discount = Math.min(discount, coupon.maxDiscount || Infinity);
     }
 
-    // **6. Calculate Total Amount**
-    const totalAmount = totalProductPrice - discount + deliveryCost;
+    const totalAmount = parseFloat(
+      (totalProductPrice - discount + deliveryCost).toFixed(3)
+    );
 
-    // **7. Prepare Order Data**
-    const orderData = {
+    // Create temporary order
+    tempOrder = await Order.create({
       products: cartItems,
       customer: customerId,
       totalAmount,
@@ -303,93 +286,212 @@ exports.createOrder = async (req, res) => {
       coupon: coupon
         ? {
             code: coupon.code,
-            discount: coupon.discount,
+            discount,
             discountType: coupon.discountType,
             couponRef: coupon._id,
           }
         : undefined,
-      isUrgent: isUrgent || false,
-      isPaid: false,
-      status: 'pending',
-    };
-
-    // **8. Create Order**
-    const order = await Order.create(orderData);
-
-    // **9. Initiate Payment with MyFatoorah**
+      isUrgent,
+      notes,
+      status: OrderStatus.pending,
+    });
+    // Prepare payment payload
     const paymentPayload = {
-      PaymentMethodId: '2', // Update with the correct payment method ID
-      CustomerName: `${customer.firstName} ${customer.lastName}`,
+      PaymentMethodId: paymentMethodId.toString(),
+      InvoiceValue: totalAmount,
+      CustomerName: customer.name,
       DisplayCurrencyIso: 'KWD',
       MobileCountryCode: '+965',
-      CustomerMobile: customer.mobile || '00000000',
-      CustomerEmail: customer.email || 'email@example.com',
-      InvoiceValue: totalAmount,
-      CallBackUrl: 'https://yourdomain.com/api/payment/callback',
-      ErrorUrl: 'https://yourdomain.com/api/payment/error',
+      CustomerMobile: customer.phone,
+      CustomerEmail: customer.email || 'no-email@example.com',
+      CallBackUrl: `${process.env.BACKEND_URL}/payment-callback`,
       Language: 'en',
-      CustomerReference: order._id.toString(),
-      UserDefinedField: 'Order Payment',
+      CustomerReference: tempOrder._id.toString(),
       CustomerAddress: {
-        Block: '',
+        Block: deliveryAddress.block || '',
         Street: deliveryAddress.street,
-        HouseBuildingNo: deliveryAddress.building.number || '',
-        Address: `${deliveryAddress.city}, ${deliveryAddress.governorate}, ${deliveryAddress.state}`,
+        HouseBuildingNo: deliveryAddress.building?.number || '',
+        Address: `${city.name}, ${governorate.name}, ${state.name}`,
         AddressInstructions: deliveryAddress.notes || '',
       },
-      InvoiceItems: cartItems.map((item) => ({
-        ItemName: item.product.title || 'Product',
-        Quantity: item.quantity,
-        UnitPrice: item.price,
-      })),
     };
 
-    const response = await axios.post(
+    // Execute payment
+    const paymentResponse = await axios.post(
       `${process.env.MYFATOORAH_BASE_URL}/v2/ExecutePayment`,
+      // {
+      //   InvoiceValue: totalAmount,
+      //   PaymentMethodId: paymentMethodId,
+      //   CallBackUrl: 'https://google.com',
+      //   ErrorUrl: 'https://www.keybr.com/',
+      // },
       paymentPayload,
       {
         headers: {
-          Accept: 'application/json',
           Authorization: `Bearer ${process.env.MYFATOORAH_API_KEY}`,
           'Content-Type': 'application/json',
         },
       }
     );
+    // Update order with payment details
+    const updatedOrder = await Order.findByIdAndUpdate(
+      tempOrder._id,
+      {
+        invoiceId: paymentResponse.data.Data.InvoiceId,
+        paymentUrl: paymentResponse.data.Data.PaymentURL,
+        status: OrderStatus.pending,
+      },
+      { new: true }
+    );
+    // Update coupon usage
+    if (coupon) {
+      await Coupon.findByIdAndUpdate(coupon._id, {
+        $inc: { usedCount: 1 },
+      });
+    }
 
-    const paymentData = response.data;
+    // Clear cart
+    // await Customer.findByIdAndUpdate(customerId, { cart: [] });
 
-    // **10. Update Order with Payment ID**
-    order.paymentId = paymentData.Data.PaymentId;
-    coupon.usedCount = coupon.usedCount + 1;
-    await order.save();
-    await coupon.save();
-
-    // **11. Clear Customer Cart**
-    await Customer.findByIdAndUpdate(customerId, { cart: [] });
-
-    // **12. Respond with Payment URL**
     res.status(StatusCodes.OK).json({
       success: true,
-      paymentUrl: paymentData.Data.PaymentURL,
-      orderId: order._id,
+      paymentUrl: updatedOrder.paymentUrl,
+      orderId: updatedOrder._id,
     });
   } catch (error) {
-    console.error(`Order Creation Error: ${error.message}`);
+    // Cleanup temporary order on error
+    if (tempOrder) await Order.findByIdAndDelete(tempOrder._id);
+
+    console.error('Order Creation Error:', {
+      message: error.message,
+      validationErrors: error.response?.data?.ValidationErrors,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
 
     const statusCode =
       error.response?.status || StatusCodes.INTERNAL_SERVER_ERROR;
-    const message = error.response?.data?.message || 'Failed to create order';
+    const errorMessage =
+      error.response?.data?.Message || 'Order creation failed';
 
     res.status(statusCode).json({
       success: false,
-      message,
-      error:
-        process.env.NODE_ENV === 'development'
-          ? {
-              stack: error.stack,
-              details: error.response?.data,
-            }
-          : undefined,
+      message: errorMessage,
+      ...(process.env.NODE_ENV === 'development' && {
+        errorDetails: error.response?.data,
+      }),
     });
+  }
+};
+
+// controllers/paymentController.js
+
+// 1. Payment Success Callback
+exports.paymentSuccess = async (req, res) => {
+  try {
+    console.log('Payment suceess hit.');
+    const { paymentId } = req.query;
+
+    // Verify payment
+    const verification = await axios.post(
+      `${process.env.MYFATOORAH_BASE_URL}/v2/GetPaymentStatus`,
+      { Key: paymentId, KeyType: 'PaymentId' },
+      { headers: { Authorization: `Bearer ${process.env.MYFATOORAH_API_KEY}` } }
+    );
+
+    // Update order
+    console.log(verification.data.Data);
+    await Order.findOneAndUpdate(
+      { invoiceId: verification.data.Data.InvoiceId },
+      {
+        isPaid: true,
+        status: OrderStatus.processing,
+        paymentDetails: verification.data.Data,
+      }
+    );
+
+    // Redirect to frontend success page
+    // res.redirect(`${process.env.FRONTEND_URL}/order-success`);
+    res.redirect(`https://www.google.com`);
+  } catch (error) {
+    console.error('Payment Success Error:', error);
+    res.redirect(`${process.env.FRONTEND_URL}/payment-error`);
+  }
+};
+
+exports.paymentError = async (req, res) => {
+  try {
+    console.log('--- Payment Error Endpoint Hit ---');
+    console.log('Request Query:', req.query);
+    console.log('Request Params:', req.params);
+    console.log('Request Body:', req.body);
+
+    // Capture all possible error parameters
+    const errorData = {
+      queryParams: req.query,
+      paymentId: req.query.paymentId,
+      invoiceId: req.query.invoiceId || req.query.InvoiceId,
+      error: req.query.error || req.query.Error,
+      errorCode: req.query.errorCode || req.query.ErrorCode,
+    };
+
+    console.error('Payment Failed with Details:', errorData);
+
+    // Attempt to verify payment status using available ID
+    let verification = null;
+    const key = errorData.invoiceId || errorData.paymentId;
+    const keyType = errorData.invoiceId ? 'InvoiceId' : 'PaymentId';
+
+    if (key) {
+      verification = await axios.post(
+        `${process.env.MYFATOORAH_BASE_URL}/v2/GetPaymentStatus`,
+        { Key: key, KeyType: keyType },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MYFATOORAH_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.error('Payment Verification Error Details:', verification?.data);
+    } else {
+      console.error(
+        'No valid key (invoiceId or paymentId) found for verification.'
+      );
+    }
+
+    console.log('Verification Data:', verification?.data?.Data);
+
+    // Update order with error details
+    // Update order with error details
+    if (verification && verification.data.IsSuccess) {
+      const invoiceId = verification.data.Data.InvoiceId;
+
+      await Order.findOneAndUpdate(
+        { invoiceId: invoiceId },
+        {
+          status: OrderStatus.failed,
+          paymentDetails: {
+            error:
+              errorData.error ||
+              verification.data.Data.InvoiceTransactions[0]?.Error,
+            errorCode:
+              errorData.errorCode ||
+              verification.data.Data.InvoiceTransactions[0]?.ErrorCode,
+            fullError: errorData,
+            verificationResponse: verification.data,
+          },
+        }
+      );
+    } else {
+      console.error('Verification failed or verification data is missing.');
+    }
+
+    // Optionally redirect or render an error page
+    // res.redirect(`${process.env.FRONTEND_URL}/payment-error`);
+    res.redirect(`https://www.keybr.com`);
+  } catch (error) {
+    console.error('Error Handling Failed:', error);
+    res.redirect(`${process.env.FRONTEND_URL}/error`);
   }
 };

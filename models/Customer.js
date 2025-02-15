@@ -38,6 +38,7 @@ const customerSchema = new Schema(
         notes: String,
       },
     ],
+    notes: String,
     resetToken: String,
     resetTokenExpiration: Date,
   },

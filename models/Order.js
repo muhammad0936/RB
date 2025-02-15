@@ -1,3 +1,4 @@
+// models/Order.js
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 const { OrderStatus } = require('../util/types');
@@ -31,10 +32,16 @@ const orderSchema = new Schema(
       required: true,
       ref: 'Customer',
     },
-    paymentId: {
+    invoiceId: {
       type: String,
       required: true,
-      index: true, // For faster querying
+      index: true,
+      default: () => `temp-${Date.now()}`,
+    },
+    paymentUrl: {
+      type: String,
+      required: true,
+      default: 'pending',
     },
     totalAmount: {
       type: Number,
@@ -71,13 +78,13 @@ const orderSchema = new Schema(
         floor: String,
         apartment: String,
       },
+      notes: String,
     },
     coupon: {
-      code: String, // Store denormalized coupon data
+      code: String,
       discount: {
         type: Number,
         min: 0,
-        max: 100,
       },
       discountType: {
         type: String,
@@ -101,12 +108,18 @@ const orderSchema = new Schema(
       enum: OrderStatus,
       default: OrderStatus.pending,
     },
-    // Add these new fields
+    paymentDetails: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
     trackingNumber: String,
     estimatedDelivery: Date,
     notes: String,
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    versionKey: false,
+  }
 );
 
 module.exports = mongoose.model('Order', orderSchema);
