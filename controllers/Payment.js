@@ -304,7 +304,7 @@ exports.createOrder = async (req, res) => {
       MobileCountryCode: '+965',
       CustomerMobile: customer.phone,
       CustomerEmail: customer.email || 'no-email@example.com',
-      CallBackUrl: `${process.env.BACKEND_URL}/payment-callback`,
+      CallBackUrl: `${process.env.BACKEND_URL}/payment-success`,
       Language: 'en',
       CustomerReference: tempOrder._id.toString(),
       CustomerAddress: {
