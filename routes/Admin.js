@@ -6,7 +6,7 @@ const multerMiddleware = require('../middlewares/multerWithFiles');
 const multerGlobal = require('../middlewares/multerGlobal');
 
 router.post('/admin', multerGlobal, adminControllers.createAdmin);
-router.get('/login', multerGlobal, adminControllers.login);
+router.post('/login', multerGlobal, adminControllers.login);
 
 router.post(
   '/productTypes',

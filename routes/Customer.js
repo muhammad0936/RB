@@ -6,7 +6,7 @@ const multerWithFiles = require('../middlewares/multerWithFiles');
 const isAuth = require('../middlewares/isAuth');
 
 router.post('/signup', multerGlobal, customerControllers.signup);
-router.get('/login', multerGlobal, customerControllers.login);
+router.post('/login', multerGlobal, customerControllers.login);
 
 router.post('/cart', multerGlobal, isAuth, customerControllers.addToCart);
 
