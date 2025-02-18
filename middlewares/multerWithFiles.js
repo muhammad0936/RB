@@ -6,7 +6,7 @@ const path = require('path');
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let dir = 'uploads/';
-    if (file.fieldname.includes('Video')) {
+    if (file.fieldname.includes('video')) {
       dir += 'videos';
     } else {
       dir += 'images';
@@ -27,12 +27,12 @@ const fileFilter = (req, file, cb) => {
 
   // Dynamically check file type based on fieldname
   if (
-    (file.fieldname.includes('Image') || file.fieldname === 'logo') &&
+    file.fieldname.includes('image') &&
     allowedImageTypes.includes(file.mimetype)
   ) {
     cb(null, true);
   } else if (
-    file.fieldname.includes('Video') &&
+    file.fieldname.includes('video') &&
     allowedVideoTypes.includes(file.mimetype)
   ) {
     cb(null, true);

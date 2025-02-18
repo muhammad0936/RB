@@ -235,9 +235,18 @@ exports.addProduct = async (req, res, next) => {
     }
 
     // Destructure required fields from the request body
-    const { title, description, price, weight, availableSizes, productTypeId } =
-      req.body;
-
+    const {
+      title,
+      description,
+      price,
+      weight,
+      availableSizes,
+      productTypeId,
+      logoUrl = '',
+      imagesUrls = [],
+      videosUrls = [],
+    } = req.body;
+    console.log(req.body);
     // Validate 'productTypeId'
     if (!mongoose.Types.ObjectId.isValid(productTypeId)) {
       const error = new Error('Invalid product type ID');
@@ -254,14 +263,14 @@ exports.addProduct = async (req, res, next) => {
     }
 
     // Handle file uploads
-    const logoUrl = req.files?.logo?.[0]?.path || '';
-    const imagesUrls = req.files?.productImages?.map((i) => i?.path) || [];
+    // const logoUrl = req.files?.logo?.[0]?.path || '';
+    // const imagesUrls = req.files?.productImages?.map((i) => i?.path) || [];
     if (imagesUrls.length === 0) {
       const error = new Error('Provide at least one image.');
       error.statusCode = 422;
       throw error;
     }
-    const videosUrls = req.files?.productVideos?.map((v) => v?.path) || [];
+    // const videosUrls = req.files?.productVideos?.map((v) => v?.path) || [];
 
     // Create a new product
     const product = new Product({
@@ -289,18 +298,6 @@ exports.addProduct = async (req, res, next) => {
   } catch (err) {
     // Set default error status code
     if (!err.statusCode) err.statusCode = 500;
-
-    // Clean up uploaded files if there's an error
-    if (req.files) {
-      if (req.files?.logo?.[0]?.path) unlink(req.files.logo[0].path);
-      req.files?.productImages?.forEach((i) => {
-        if (i.path) unlink(i.path);
-      });
-      req.files?.productVideos?.forEach((v) => {
-        if (v.path) unlink(v.path);
-      });
-    }
-
     // Pass the error to the next middleware
     next(err);
   }
