@@ -621,7 +621,6 @@ exports.deleteProduct = async (req, res, next) => {
         })
       )
     );
-
     // Delete from database
     await Product.deleteOne({ _id: productId });
 
