@@ -91,8 +91,9 @@ exports.login = async (req, res, next) => {
       'thisismysecretkey',
       { expiresIn: '30d' }
     );
-    res.header('Authorization', `Bearer ${token}`);
-    res.status(200).json({ message: 'signed in successfully.' });
+    res
+      .status(200)
+      .json({ message: 'signed in successfully.', JWT: `Bearer ${token}` });
   } catch (error) {
     if (!error.statusCode && !error[0]) error.statusCode = 500;
     next(error);
