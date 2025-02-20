@@ -22,11 +22,7 @@ const CustomerOrderRoutes = require('./routes/CustomerOrder');
 const AdminOrderRoutes = require('./routes/AdminOrder');
 
 const connectToDatabase = require('./database/connection');
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', '*');
-  next();
-});
+
 app.use(bodyParser());
 app.use(cors());
 app.use(helmet());
@@ -36,8 +32,14 @@ app.use(compression());
 //   { flags: 'a' }
 // );
 // app.use(morgan('tiny', { stream: accessLogStream }));
-
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res, path) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  })
+);
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
