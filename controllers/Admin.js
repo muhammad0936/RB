@@ -276,7 +276,6 @@ exports.addProduct = async (req, res, next) => {
       imagesUrls = [],
       videosUrls = [],
     } = req.body;
-    console.log(req.body);
     // Validate 'productTypeId'
     if (!mongoose.Types.ObjectId.isValid(productTypeId)) {
       const error = new Error('Invalid product type ID');
@@ -292,15 +291,32 @@ exports.addProduct = async (req, res, next) => {
       throw error;
     }
 
-    // Handle file uploads
-    // const logoUrl = req.files?.logo?.[0]?.path || '';
-    // const imagesUrls = req.files?.productImages?.map((i) => i?.path) || [];
     if (imagesUrls.length === 0) {
       const error = new Error('Provide at least one image.');
       error.statusCode = 422;
       throw error;
     }
-    // const videosUrls = req.files?.productVideos?.map((v) => v?.path) || [];
+    const normalizeUrl = (url) => {
+      if (!url) return ''; // Return empty string if URL is falsy
+      return url.replace(/\\/g, '/'); // Replace backslashes with forward slashes
+    };
+
+    // Normalize logo URL (handle undefined or empty string)
+    const normalizedLogoUrl = normalizeUrl(logoUrl);
+
+    // Normalize images URLs (handle single string or array)
+    const normalizedImagesUrls = Array.isArray(imagesUrls)
+      ? imagesUrls.map(normalizeUrl) // If it's an array, map over it
+      : imagesUrls // If it's a single string
+      ? [normalizeUrl(imagesUrls)] // Convert it to an array with one normalized URL
+      : []; // If it's undefined or empty, default to an empty array
+
+    // Normalize videos URLs (handle single string or array)
+    const normalizedVideosUrls = Array.isArray(videosUrls)
+      ? videosUrls.map(normalizeUrl) // If it's an array, map over it
+      : videosUrls // If it's a single string
+      ? [normalizeUrl(videosUrls)] // Convert it to an array with one normalized URL
+      : []; // If it's undefined or empty, default to an empty array
 
     // Create a new product
     const product = new Product({
@@ -311,9 +327,9 @@ exports.addProduct = async (req, res, next) => {
       weight: parseFloat(weight),
       creator: admin._id,
       lastEditor: admin._id,
-      logoUrl,
-      imagesUrls,
-      videosUrls,
+      logoUrl: normalizedLogoUrl,
+      imagesUrls: normalizedImagesUrls,
+      videosUrls: normalizedVideosUrls,
       productType: productType._id, // Store only the ID
     });
 
