@@ -22,6 +22,12 @@ const CustomerOrderRoutes = require('./routes/CustomerOrder');
 const AdminOrderRoutes = require('./routes/AdminOrder');
 
 const connectToDatabase = require('./database/connection');
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', '*');
+  next();
+});
 app.use(bodyParser());
 app.use(cors());
 app.use(helmet());
