@@ -67,10 +67,10 @@ router.post('/admin', multerGlobal, adminControllers.createAdmin);
 router.post('/login', multerGlobal, adminControllers.login);
 
 router.post(
-  '/productTypes',
+  '/productType',
   multerGlobal,
   isAuth,
-  adminControllers.addProductTypes
+  adminControllers.addProductType
 );
 router.delete(
   '/productTypes',
@@ -137,5 +137,7 @@ router.delete(
 );
 
 router.get('/coupons', multerGlobal, isAuth, adminControllers.getCoupons);
+
+router.get('/customers', multerGlobal, isAuth, adminControllers.getCustomers);
 
 module.exports = router;

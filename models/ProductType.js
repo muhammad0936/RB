@@ -6,6 +6,7 @@ const productTypeSchema = new Schema({
     type: String,
     required: true,
   },
+  imageUrl: String,
   parentProductType: {
     type: Schema.Types.ObjectId,
     ref: 'ProductType',

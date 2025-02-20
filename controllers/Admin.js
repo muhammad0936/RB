@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 
 // Models
 const Admin = require('../models/Admin');
+const Customer = require('../models/Customer');
 const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
 const State = require('../models/State');
@@ -97,7 +98,7 @@ exports.login = async (req, res, next) => {
 };
 // controllers/yourControllerFile.js
 
-exports.addProductTypes = async (req, res, next) => {
+exports.addProductType = async (req, res, next) => {
   try {
     const admin = await Admin.findById(req.userId);
     if (!admin) {
@@ -106,41 +107,69 @@ exports.addProductTypes = async (req, res, next) => {
       throw error;
     }
 
-    let { names, parentProductTypeId } = req.body;
+    const { name, imageUrl, parentProductTypeId } = req.body;
 
-    // Ensure 'names' is an array
-    if (!Array.isArray(names)) names = names ? [names] : [];
-
-    // Validate parentProductTypeId if provided
-    if (
-      parentProductTypeId &&
-      !mongoose.Types.ObjectId.isValid(parentProductTypeId)
-    ) {
-      const error = new Error('Invalid parent product type ID');
+    // Validate required fields
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      const error = new Error('Valid product type name is required');
       error.statusCode = 422;
       throw error;
     }
 
-    // Use Promise.all to handle all async operations
-    const createdProductTypes = await Promise.all(
-      names.map(async (name) => {
-        const productType = new ProductType({
-          name,
-          parentProductType: parentProductTypeId || null,
-        });
-        return await productType.save();
-      })
-    );
-
-    if (createdProductTypes.length === 0) {
-      const error = new Error('No product types created!');
+    // Validate image URL format
+    if (imageUrl && typeof imageUrl !== 'string') {
+      const error = new Error('Invalid image URL format');
       error.statusCode = 422;
       throw error;
     }
+
+    // Validate parent product type ID if provided
+    if (parentProductTypeId) {
+      if (!mongoose.Types.ObjectId.isValid(parentProductTypeId)) {
+        const error = new Error('Invalid parent product type ID');
+        error.statusCode = 422;
+        throw error;
+      }
+      // Optional: Check if parent exists
+      const parentExists = await ProductType.exists({
+        _id: parentProductTypeId,
+      });
+      if (!parentExists) {
+        const error = new Error('Parent product type not found');
+        error.statusCode = 404;
+        throw error;
+      }
+    }
+
+    // Check for existing product type with same name
+    const existingType = await ProductType.findOne({
+      name: { $regex: new RegExp(`^${name}$`, 'i') },
+    });
+
+    if (existingType) {
+      const error = new Error('Product type with this name already exists');
+      error.statusCode = 409;
+      throw error;
+    }
+
+    // Create new product type
+    const productType = new ProductType({
+      name: name.trim(),
+      imageUrl: imageUrl || null,
+      parentProductType: parentProductTypeId || null,
+    });
+
+    const savedProductType = await productType.save();
 
     res.status(201).json({
-      message: 'Product types created successfully.',
-      productTypes: createdProductTypes,
+      message: 'Product type created successfully.',
+      productType: {
+        _id: savedProductType._id,
+        name: savedProductType.name,
+        imageUrl: savedProductType.imageUrl,
+        parentProductType: savedProductType.parentProductType,
+        createdAt: savedProductType.createdAt,
+      },
     });
   } catch (err) {
     if (!err.statusCode) err.statusCode = 500;
@@ -1207,6 +1236,82 @@ exports.getCoupons = async (req, res) => {
       success: false,
       message: 'Failed to retrieve coupons',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+// Get all customers with filters
+exports.getCustomers = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      sortBy = '-createdAt',
+      startDate,
+      endDate,
+      hasOrders,
+    } = req.query;
+
+    const filter = {};
+    const projection = {
+      password: 0,
+      resetToken: 0,
+      resetTokenExpiration: 0,
+      __v: 0,
+    };
+
+    // Search filter
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      filter.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex },
+      ];
+    }
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sort: sortBy,
+      select: projection,
+    };
+
+    const customers = await Customer.paginate(filter, options);
+
+    // Transform response for dashboard
+    const response = {
+      success: true,
+      customers: customers.docs.map((customer) => ({
+        id: customer._id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        joined: customer.createdAt,
+        lastActivity: customer.updatedAt,
+      })),
+      pagination: {
+        totalCustomers: customers.totalDocs,
+        currentPage: customers.page,
+        totalPages: customers.totalPages,
+        hasNextPage: customers.hasNextPage,
+      },
+    };
+
+    res.status(StatusCodes.OK).json(response);
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to retrieve customers',
     });
   }
 };

@@ -1,7 +1,8 @@
 exports.OrderStatus = {
   pending: 'Pending',
   processing: 'Processing',
-  paid: 'Paid',
-  finished: 'Finished',
-  failed: 'Failed',
+  cut: 'Cut',
+  sewn: 'Sewn',
+  delivering: 'Delivering',
+  completed: 'Completed',
 };

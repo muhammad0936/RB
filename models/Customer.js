@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const mongoosePaginate = require('mongoose-paginate-v2');
 const Schema = mongoose.Schema;
 
 const customerSchema = new Schema(
@@ -38,11 +39,11 @@ const customerSchema = new Schema(
         notes: String,
       },
     ],
-    notes: String,
     resetToken: String,
     resetTokenExpiration: Date,
   },
   { timestamps: true }
 );
+customerSchema.plugin(mongoosePaginate);
 
 module.exports = mongoose.model('Customer', customerSchema);

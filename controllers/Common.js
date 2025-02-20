@@ -7,6 +7,7 @@ const ProductType = require('../models/ProductType');
 const State = require('../models/State');
 const Governorate = require('../models/Governorate');
 const City = require('../models/City');
+const { OrderStatus } = require('../util/types');
 
 exports.getParentProductTypes = async (req, res, next) => {
   try {
@@ -33,6 +34,14 @@ exports.getChildProductTypes = async (req, res, next) => {
     if (!mongoose.Types.ObjectId.isValid(parentProductTypeId)) {
       const error = new Error('Invalid parent product type ID');
       error.statusCode = 422;
+      throw error;
+    }
+    const parentProductTypeeExists = await ProductType.exists({
+      _id: parentProductTypeId,
+    });
+    if (!parentProductTypeeExists) {
+      const error = new Error('Parent product type not found!');
+      error.statusCode = StatusCodes.NOT_FOUND;
       throw error;
     }
 
@@ -331,4 +340,8 @@ exports.getCitiesByGovernorate = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+exports.getOrderStatuses = async (req, res) => {
+  res.status(200).json(OrderStatus);
 };
