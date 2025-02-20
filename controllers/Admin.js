@@ -276,7 +276,7 @@ exports.addProduct = async (req, res, next) => {
       imagesUrls = [],
       videosUrls = [],
     } = req.body;
-    console.log(req.body);
+
     // Validate 'productTypeId'
     if (!mongoose.Types.ObjectId.isValid(productTypeId)) {
       const error = new Error('Invalid product type ID');
@@ -292,15 +292,19 @@ exports.addProduct = async (req, res, next) => {
       throw error;
     }
 
-    // Handle file uploads
-    // const logoUrl = req.files?.logo?.[0]?.path || '';
-    // const imagesUrls = req.files?.productImages?.map((i) => i?.path) || [];
+    // Validate at least one image is provided
     if (imagesUrls.length === 0) {
       const error = new Error('Provide at least one image.');
       error.statusCode = 422;
       throw error;
     }
-    // const videosUrls = req.files?.productVideos?.map((v) => v?.path) || [];
+
+    // Normalize image and video URLs
+    const normalizeUrl = (url) => url.replace(/\\/g, '/'); // Replace backslashes with forward slashes
+
+    const normalizedLogoUrl = logoUrl ? normalizeUrl(logoUrl) : '';
+    const normalizedImagesUrls = imagesUrls.map(normalizeUrl);
+    const normalizedVideosUrls = videosUrls.map(normalizeUrl);
 
     // Create a new product
     const product = new Product({
@@ -311,9 +315,9 @@ exports.addProduct = async (req, res, next) => {
       weight: parseFloat(weight),
       creator: admin._id,
       lastEditor: admin._id,
-      logoUrl,
-      imagesUrls,
-      videosUrls,
+      logoUrl: normalizedLogoUrl,
+      imagesUrls: normalizedImagesUrls,
+      videosUrls: normalizedVideosUrls,
       productType: productType._id, // Store only the ID
     });
 
@@ -324,6 +328,12 @@ exports.addProduct = async (req, res, next) => {
     res.status(201).json({
       message: 'Product created successfully.',
       productId: product._id,
+      product: {
+        ...product.toObject(),
+        logoUrl: normalizedLogoUrl,
+        imagesUrls: normalizedImagesUrls,
+        videosUrls: normalizedVideosUrls,
+      },
     });
   } catch (err) {
     // Set default error status code
