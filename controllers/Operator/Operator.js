@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
-const Order = require('../models/Order');
-const Operator = require('../models/Operator');
-const { OrderStatus } = require('../util/types');
+const Order = require('../../models/Order');
+const Operator = require('../../models/Operator');
+const { OrderStatus } = require('../../util/types');
 
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');

@@ -14,10 +14,18 @@ const {
   checkout,
   createOrder,
 } = require('../controllers/Customer/Order');
+const {
+  requestPasswordReset,
+  resetPassword,
+} = require('../controllers/Customer/ResetPassword');
 
 router.post('/signup', multerGlobal, signup);
 
 router.post('/login', multerGlobal, login);
+
+router.post('/requestPasswordReset', multerGlobal, requestPasswordReset);
+
+router.post('/resetPassword', multerGlobal, resetPassword);
 
 router.post('/cart', multerGlobal, isAuth, addToCart);
 

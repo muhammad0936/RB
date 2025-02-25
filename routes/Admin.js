@@ -36,6 +36,10 @@ const {
   deleteOperator,
   getOperators,
 } = require('../controllers/Admin/Operator');
+const {
+  requestPasswordReset,
+  resetPassword,
+} = require('../controllers/Admin/ResetPassword');
 
 router.post(
   '/upload/image',
@@ -58,6 +62,10 @@ router.post(
 router.post('/admin', multerGlobal, createAdmin);
 
 router.post('/login', multerGlobal, login);
+
+router.post('/requestPasswordReset', multerGlobal, requestPasswordReset);
+
+router.post('/resetPassword', multerGlobal, resetPassword);
 
 router.post('/productType', multerGlobal, isAuth, addProductType);
 
