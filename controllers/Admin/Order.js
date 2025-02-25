@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { StatusCodes } = require('http-status-codes');
-const Order = require('../models/Order');
-const { OrderStatus } = require('../util/types');
+const Order = require('../../models/Order');
+const { OrderStatus } = require('../../util/types');
 
 exports.getOrderStatuses = async (req, res) => {
   res.status(200).json(OrderStatus);
@@ -10,6 +10,7 @@ exports.getOrderStatuses = async (req, res) => {
 // Get all orders (admin)
 exports.getOrders = async (req, res) => {
   try {
+    const admin = await ensureIsAdmin(req.userId);
     const {
       page = 1,
       limit = 10,
@@ -95,6 +96,7 @@ exports.getOrders = async (req, res) => {
 // Get single order details (admin)
 exports.getOneOrder = async (req, res) => {
   try {
+    const admin = await ensureIsAdmin(req.userId);
     const { orderId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(orderId)) {

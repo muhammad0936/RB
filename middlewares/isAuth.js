@@ -4,7 +4,7 @@ module.exports = (req, res, next) => {
   try {
     let token = req.get('Authorization');
     if (!token) {
-      const error = new Error('jwt must be provided');
+      const error = new Error(`jwt must be provided`);
       error.statusCode = 422;
       throw error;
     }

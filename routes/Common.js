@@ -1,29 +1,40 @@
 const express = require('express');
 const router = express.Router();
-const CommonControllers = require('../controllers/Common');
-const multerGlobal = require('../middlewares/multerGlobal');
+const {
+  getParentProductTypes,
+  getChildProductTypes,
+} = require('../controllers/Common/ProcutTypes');
+const {
+  getProducts,
+  getBestSellers,
+  getOneProduct,
+} = require('../controllers/Common/Products');
+const {
+  getAllStates,
+  getStateByName,
+  getGovernoratesByState,
+  getCitiesByGovernorate,
+  getOrderStatuses,
+} = require('../controllers/Common/Location');
 
-router.get('/parentProductTypes', CommonControllers.getParentProductTypes);
+router.get('/parentProductTypes', getParentProductTypes);
 
-router.get(
-  '/childrenProductTypes/:parentProductTypeId',
-  CommonControllers.getChildProductTypes
-);
+router.get('/childrenProductTypes/:parentProductTypeId', getChildProductTypes);
 
-router.get('/products', CommonControllers.getProducts);
+router.get('/products', getProducts);
 
-router.get('/product/:productId', CommonControllers.getOneProduct);
+router.get('/bestsellers', getBestSellers);
 
-router.get('/states', CommonControllers.getAllStates);
+router.get('/product/:productId', getOneProduct);
 
-router.get('/state', CommonControllers.getStateByName);
+router.get('/states', getAllStates);
 
-router.get('/governorates/:stateId', CommonControllers.getGovernoratesByState);
+router.get('/state', getStateByName);
 
-// router.get('/governorate/:id', CommonControllers.getGovernorateById);
+router.get('/governorates/:stateId', getGovernoratesByState);
 
-router.get('/cities/:governorateId', CommonControllers.getCitiesByGovernorate);
+router.get('/cities/:governorateId', getCitiesByGovernorate);
 
-router.get('/orderStatuses', CommonControllers.getOrderStatuses);
+router.get('/orderStatuses', getOrderStatuses);
 
 module.exports = router;

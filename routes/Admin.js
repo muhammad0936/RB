@@ -1,9 +1,41 @@
 const express = require('express');
 const router = express.Router();
-const adminControllers = require('../controllers/Admin');
 const isAuth = require('../middlewares/isAuth');
 const multerMiddleware = require('../middlewares/multerWithFiles');
 const multerGlobal = require('../middlewares/multerGlobal');
+const { uploadImage } = require('../controllers/Upload/Image');
+const { uploadVideo } = require('../controllers/Upload/Video');
+const { createAdmin, login } = require('../controllers/Admin/Auth');
+const {
+  addProductType,
+  deleteProductTypes,
+} = require('../controllers/Admin/ProductType');
+const {
+  addProduct,
+  editProduct,
+  deleteProduct,
+} = require('../controllers/Admin/Product');
+const {
+  addState,
+  editState,
+  deleteState,
+  addGovernorate,
+  deleteGovernorate,
+  addCity,
+  deleteCity,
+} = require('../controllers/Admin/Location');
+const { getCustomers } = require('../controllers/Admin/Customer');
+const {
+  deleteCoupon,
+  getCoupons,
+  addCoupon,
+} = require('../controllers/Admin/Coupon');
+const { getOrders, getOneOrder } = require('../controllers/Admin/Order');
+const {
+  addOperator,
+  deleteOperator,
+  getOperators,
+} = require('../controllers/Admin/Operator');
 
 router.post(
   '/upload/image',
@@ -11,27 +43,7 @@ router.post(
     { name: 'image', maxCount: 1 }, // Single image
   ]),
   isAuth,
-  (req, res, next) => {
-    try {
-      const imageUrl = req.files?.image?.[0]?.path || '';
-      if (imageUrl === '') {
-        const error = new Error('Provide at least one image.');
-        error.statusCode = 422;
-        throw error;
-      }
-      res.status(201).json({ message: 'Image uploaded.', imageUrl });
-    } catch (err) {
-      if (!err.statusCode) err.statusCode = 500;
-
-      // Clean up uploaded files if there's an error
-      if (req.files) {
-        if (req.files?.image?.[0]?.path) unlink(req.files.image[0].path);
-      }
-
-      // Pass the error to the next middleware
-      next(err);
-    }
-  }
+  uploadImage
 );
 
 router.post(
@@ -40,44 +52,16 @@ router.post(
     { name: 'video', maxCount: 1 }, // Single image
   ]),
   isAuth,
-  (req, res, next) => {
-    try {
-      const videoUrl = req.files?.video?.[0]?.path || '';
-      if (videoUrl === '') {
-        const error = new Error('Provide at least one video.');
-        error.statusCode = 422;
-        throw error;
-      }
-      res.status(201).json({ message: 'Video uploaded.', videoUrl });
-    } catch (err) {
-      if (!err.statusCode) err.statusCode = 500;
-
-      // Clean up uploaded files if there's an error
-      if (req.files) {
-        if (req.files?.video?.[0]?.path) unlink(req.files.video[0].path);
-      }
-
-      // Pass the error to the next middleware
-      next(err);
-    }
-  }
+  uploadVideo
 );
 
-router.post('/admin', multerGlobal, adminControllers.createAdmin);
-router.post('/login', multerGlobal, adminControllers.login);
+router.post('/admin', multerGlobal, createAdmin);
 
-router.post(
-  '/productType',
-  multerGlobal,
-  isAuth,
-  adminControllers.addProductType
-);
-router.delete(
-  '/productTypes',
-  multerGlobal,
-  isAuth,
-  adminControllers.deleteProductTypes
-);
+router.post('/login', multerGlobal, login);
+
+router.post('/productType', multerGlobal, isAuth, addProductType);
+
+router.delete('/productTypes', multerGlobal, isAuth, deleteProductTypes);
 
 router.post(
   '/product',
@@ -87,7 +71,7 @@ router.post(
     { name: 'productVideos', maxCount: 3 }, // Up to 3 videos
   ]),
   isAuth,
-  adminControllers.addProduct
+  addProduct
 );
 
 router.put(
@@ -98,46 +82,40 @@ router.put(
     { name: 'productVideos', maxCount: 3 }, // Up to 3 videos
   ]),
   isAuth,
-  adminControllers.editProduct
+  editProduct
 );
 
-router.delete('/product/:productId', isAuth, adminControllers.deleteProduct);
+router.delete('/product/:productId', isAuth, deleteProduct);
 
-router.post('/state', multerGlobal, isAuth, adminControllers.addState);
+router.post('/state', multerGlobal, isAuth, addState);
 
-router.put('/state/:stateId', multerGlobal, isAuth, adminControllers.editState);
+router.put('/state/:stateId', multerGlobal, isAuth, editState);
 
-router.delete('/state/:id', multerGlobal, isAuth, adminControllers.deleteState);
+router.delete('/state/:id', multerGlobal, isAuth, deleteState);
 
-router.post(
-  '/governorate',
-  multerGlobal,
-  isAuth,
-  adminControllers.addGovernorate
-);
+router.post('/governorate', multerGlobal, isAuth, addGovernorate);
 
-router.delete(
-  '/governorate/:id',
-  multerGlobal,
-  isAuth,
-  adminControllers.deleteGovernorate
-);
+router.delete('/governorate/:id', multerGlobal, isAuth, deleteGovernorate);
 
-router.post('/city', multerGlobal, isAuth, adminControllers.addCity);
+router.post('/city', multerGlobal, isAuth, addCity);
 
-router.delete('/city/:id', multerGlobal, isAuth, adminControllers.deleteCity);
+router.delete('/city/:id', multerGlobal, isAuth, deleteCity);
 
-router.post('/coupon', multerGlobal, isAuth, adminControllers.addCoupon);
+router.post('/coupon', multerGlobal, isAuth, addCoupon);
 
-router.delete(
-  '/coupon/:id',
-  multerGlobal,
-  isAuth,
-  adminControllers.deleteCoupon
-);
+router.delete('/coupon/:id', multerGlobal, isAuth, deleteCoupon);
 
-router.get('/coupons', multerGlobal, isAuth, adminControllers.getCoupons);
+router.get('/coupons', multerGlobal, isAuth, getCoupons);
 
-router.get('/customers', multerGlobal, isAuth, adminControllers.getCustomers);
+router.get('/orders', multerGlobal, isAuth, getOrders);
 
+router.get('/orders/:orderId', isAuth, multerGlobal, getOneOrder);
+
+router.get('/customers', multerGlobal, isAuth, getCustomers);
+
+router.post('/operator', multerGlobal, isAuth, addOperator);
+
+router.delete('/operator/:id', isAuth, deleteOperator);
+
+router.get('/operators', multerGlobal, isAuth, getOperators);
 module.exports = router;

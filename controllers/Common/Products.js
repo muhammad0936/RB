@@ -1,64 +1,9 @@
 const { StatusCodes } = require('http-status-codes');
 const mongoose = require('mongoose');
 
-const Admin = require('../models/Admin');
-const Product = require('../models/Product');
-const ProductType = require('../models/ProductType');
-const State = require('../models/State');
-const Governorate = require('../models/Governorate');
-const City = require('../models/City');
-const { OrderStatus } = require('../util/types');
-
-exports.getParentProductTypes = async (req, res, next) => {
-  try {
-    // Fetch all product types where parentProductType is null (top-level types)
-    const parentProductTypes = await ProductType.find({
-      parentProductType: null,
-    });
-
-    res.status(200).json({
-      message: 'Parent product types fetched successfully.',
-      productTypes: parentProductTypes,
-    });
-  } catch (err) {
-    if (!err.statusCode) err.statusCode = 500;
-    next(err);
-  }
-};
-
-exports.getChildProductTypes = async (req, res, next) => {
-  try {
-    const parentProductTypeId = req.params.parentProductTypeId;
-
-    // Validate the provided ID
-    if (!mongoose.Types.ObjectId.isValid(parentProductTypeId)) {
-      const error = new Error('Invalid parent product type ID');
-      error.statusCode = 422;
-      throw error;
-    }
-    const parentProductTypeeExists = await ProductType.exists({
-      _id: parentProductTypeId,
-    });
-    if (!parentProductTypeeExists) {
-      const error = new Error('Parent product type not found!');
-      error.statusCode = StatusCodes.NOT_FOUND;
-      throw error;
-    }
-
-    // Fetch all product types where parentProductType matches the given ID
-    const childProductTypes = await ProductType.find({
-      parentProductType: parentProductTypeId,
-    });
-
-    res.status(200).json({
-      message: 'Child product types fetched successfully.',
-      productTypes: childProductTypes,
-    });
-  } catch (err) {
-    if (!err.statusCode) err.statusCode = 500;
-    next(err);
-  }
-};
+const Product = require('../../models/Product');
+const ProductType = require('../../models/ProductType');
+const Order = require('../../models/Order');
 
 exports.getProducts = async (req, res, next) => {
   try {
@@ -282,66 +227,122 @@ exports.getOneProduct = async (req, res, next) => {
   }
 };
 
-exports.getAllStates = async (req, res, next) => {
+exports.getBestSellers = async (req, res, next) => {
   try {
-    const states = await State.find().select(
-      '_id name firstKiloDeliveryCost deliveryCostPerKilo'
-    );
-    res.status(StatusCodes.OK).json(states);
-  } catch (error) {
-    next(error);
-  }
-};
+    const { limit = 10, period = 'all' } = req.query;
 
-exports.getStateByName = async (req, res, next) => {
-  try {
-    const { name = '' } = req.query;
-    const state = await State.findOne({ name }).select(
-      '_id name firstKiloDeliveryCost deliveryCostPerKilo'
-    );
-    if (!state) {
-      const error = new Error('State not found');
-      error.statusCode = StatusCodes.NOT_FOUND;
-      throw error;
+    // Validate limit
+    if (isNaN(limit) || limit < 1 || limit > 100) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Limit must be a number between 1 and 100',
+      });
     }
-    res.status(StatusCodes.OK).json(state);
-  } catch (error) {
-    next(error);
-  }
-};
 
-exports.getGovernoratesByState = async (req, res, next) => {
-  try {
-    const state = await State.findById(req.params.stateId).populate({
-      path: 'governorates',
-      select: '_id name',
+    // Define date range based on period
+    let startDate;
+    const currentDate = new Date();
+
+    switch (period) {
+      case 'week':
+        startDate = new Date(currentDate.setDate(currentDate.getDate() - 7));
+        break;
+      case 'month':
+        startDate = new Date(currentDate.setMonth(currentDate.getMonth() - 1));
+        break;
+      case 'year':
+        startDate = new Date(
+          currentDate.setFullYear(currentDate.getFullYear() - 1)
+        );
+        break;
+      default:
+        startDate = null; // All time
+    }
+
+    const bestSellers = await Order.aggregate([
+      // 1. Match orders within the specified period
+      {
+        $match: startDate
+          ? {
+              createdAt: { $gte: startDate },
+              'products.product': { $exists: true, $type: 'objectId' },
+            }
+          : { 'products.product': { $exists: true, $type: 'objectId' } },
+      },
+      // 2. Unwind the products array
+      { $unwind: '$products' },
+      // 3. Filter valid product entries
+      {
+        $match: {
+          'products.product': { $exists: true, $type: 'objectId' },
+          'products.quantity': { $gt: 0 },
+        },
+      },
+      // 4. Group by product ID and sum quantities
+      {
+        $group: {
+          _id: '$products.product',
+          totalQuantity: { $sum: '$products.quantity' },
+        },
+      },
+      // 5. Sort by total quantity (descending)
+      { $sort: { totalQuantity: -1 } },
+      // 6. Limit the results
+      { $limit: parseInt(limit) },
+      // 7. Lookup product details
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'productDetails',
+        },
+      },
+      // 8. Unwind product details
+      {
+        $unwind: { path: '$productDetails', preserveNullAndEmptyArrays: true },
+      },
+      // 9. Project final fields
+      {
+        $project: {
+          _id: 0,
+          productId: '$_id',
+          name: '$productDetails.title',
+          price: '$productDetails.price',
+          image: {
+            $cond: {
+              if: { $isArray: '$productDetails.imagesUrls' },
+              then: { $arrayElemAt: ['$productDetails.imagesUrls', 0] },
+              else: null,
+            },
+          },
+          totalQuantity: 1,
+        },
+      },
+      // 10. Optional: Exclude products missing details
+      // { $match: { name: { $exists: true } } },
+    ]);
+
+    // If no best sellers found
+    if (bestSellers.length === 0) {
+      return res.status(StatusCodes.OK).json({
+        success: true,
+        message: 'No best-selling products found',
+        bestSellers: [],
+      });
+    }
+
+    // Return best sellers
+    res.status(StatusCodes.OK).json({
+      success: true,
+      numberOfEntities: bestSellers.length,
+      bestSellers,
     });
-    if (!state) {
-      const error = new Error('State not found');
-      error.statusCode = StatusCodes.NOT_FOUND;
-      throw error;
-    }
-    res.status(StatusCodes.OK).json(state.governorates);
   } catch (error) {
-    next(error);
+    console.error('Error fetching best sellers:', error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to fetch best-selling products',
+    });
   }
-};
-exports.getCitiesByGovernorate = async (req, res, next) => {
-  try {
-    const governorate = await Governorate.findById(
-      req.params.governorateId
-    ).populate({ path: 'cities', select: '_id name' });
-    if (!governorate) {
-      const error = new Error('Governorate not found');
-      error.statusCode = StatusCodes.NOT_FOUND;
-      throw error;
-    }
-    res.status(StatusCodes.OK).json(governorate.cities);
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.getOrderStatuses = async (req, res) => {
-  res.status(200).json(OrderStatus);
 };

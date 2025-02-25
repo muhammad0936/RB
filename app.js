@@ -17,9 +17,7 @@ const AdminRoutes = require('./routes/Admin');
 const OperatorRoutes = require('./routes/Operator');
 const CustomerRoutes = require('./routes/Customer');
 const CommonRoutes = require('./routes/Common');
-const OrderRoutes = require('./routes/Order');
-const CustomerOrderRoutes = require('./routes/CustomerOrder');
-const AdminOrderRoutes = require('./routes/AdminOrder');
+const PaymentRoutes = require('./routes/Payment');
 
 const connectToDatabase = require('./database/connection');
 
@@ -55,12 +53,10 @@ app.use((req, res, next) => {
 });
 
 app.use('/admin', AdminRoutes);
-app.use('/admin', AdminOrderRoutes);
 app.use('/operator', OperatorRoutes);
 app.use('/customer', CustomerRoutes);
-app.use('/customer', CustomerOrderRoutes);
 app.use(CommonRoutes);
-app.use(OrderRoutes);
+app.use(PaymentRoutes);
 
 app.use((req, res, next) => {
   if (req.files) {
