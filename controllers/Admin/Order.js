@@ -128,6 +128,7 @@ exports.getOneOrder = async (req, res) => {
         message: 'Order not found',
       });
     }
+    console.log(order.products);
 
     // Format order information with admin-specific details
     const adminOrderDetails = {
@@ -159,7 +160,7 @@ exports.getOneOrder = async (req, res) => {
         notes: order.deliveryAddress.notes || '',
       },
       products: order.products.map((item) => ({
-        title: item.product.title,
+        title: item?.product?.title,
         quantity: item.quantity,
         price: item.price,
         size: item.size,
@@ -173,9 +174,9 @@ exports.getOneOrder = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching order:', error);
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+    res.status(error.statusCode || StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: 'Failed to retrieve order details',
+      message: error.message || 'Failed to retrieve order details',
     });
   }
 };
