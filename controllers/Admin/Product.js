@@ -97,23 +97,9 @@ exports.addProduct = async (req, res, next) => {
   }
 };
 const fs = require('fs').promises; // For unlinking files asynchronously
-
 exports.editProduct = async (req, res, next) => {
-  let oldFiles = {
-    logo: null,
-    images: [],
-    videos: [],
-  };
-
-  let sizeChanges = {
-    added: [],
-    removed: [],
-    hadChanges: false,
-  };
-
   try {
     // **Authentication & Authorization**
-
     const admin = await ensureIsAdmin(req.userId);
 
     // **Validate product ID**
@@ -132,124 +118,23 @@ exports.editProduct = async (req, res, next) => {
       throw error;
     }
 
-    // **Store original state**
-    const originalSizes = [...product.availableSizes];
-    oldFiles = {
-      logo: product.logoUrl,
+    // **Store original state for comparison**
+    const originalState = {
+      sizes: [...product.availableSizes],
       images: [...product.imagesUrls],
       videos: [...product.videosUrls],
+      logo: product.logoUrl,
     };
 
-    // **Destructure and process updates**
-    const {
-      title = '',
-      description = '',
-      addSizes = [],
-      removeSizes = [],
-      price,
-      weight,
-      productTypeId = '',
-      removeImages = [],
-      removeVideos = [],
-    } = req.body;
+    // **Process updates**
+    // Core fields
+    if (req.body.title !== undefined) product.title = req.body.title;
+    if (req.body.description !== undefined)
+      product.description = req.body.description;
 
-    // **Validate size parameters**
-    if (!Array.isArray(addSizes) || !Array.isArray(removeSizes)) {
-      const error = new Error('addSizes and removeSizes must be arrays');
-      error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
-      throw error;
-    }
-
-    // **Process size removals**
-    const numericRemoveSizes = removeSizes.map((size) => {
-      const parsed = Number(size);
-      if (isNaN(parsed)) {
-        const error = new Error(`Invalid size value in removeSizes: ${size}`);
-        error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
-        throw error;
-      }
-      return parsed;
-    });
-
-    // **Remove specified sizes**
-    let updatedSizes = originalSizes.filter(
-      (s) => !numericRemoveSizes.includes(s)
-    );
-
-    // **Process size additions**
-    const numericAddSizes = addSizes.map((size) => {
-      const parsed = Number(size);
-      if (isNaN(parsed)) {
-        const error = new Error(`Invalid size value in addSizes: ${size}`);
-        error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
-        throw error;
-      }
-      return parsed;
-    });
-
-    // **Add new unique sizes**
-    const uniqueAddSizes = [...new Set(numericAddSizes)];
-    uniqueAddSizes.forEach((size) => {
-      if (!updatedSizes.includes(size)) {
-        updatedSizes.push(size);
-      }
-    });
-
-    // **Update product sizes**
-    product.availableSizes = updatedSizes.sort((a, b) => a - b);
-
-    // **Track changes**
-    sizeChanges.added = uniqueAddSizes.filter(
-      (s) => !originalSizes.includes(s)
-    );
-    sizeChanges.removed = numericRemoveSizes.filter((s) =>
-      originalSizes.includes(s)
-    );
-    sizeChanges.hadChanges =
-      sizeChanges.added.length > 0 || sizeChanges.removed.length > 0;
-
-    // **Validate product type**
-    if (productTypeId) {
-      if (!mongoose.Types.ObjectId.isValid(productTypeId)) {
-        const error = new Error('Invalid product type ID');
-        error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
-        throw error;
-      }
-
-      const productType = await ProductType.findById(productTypeId);
-      if (!productType) {
-        const error = new Error('Product type not found');
-        error.statusCode = StatusCodes.NOT_FOUND;
-        throw error;
-      }
-
-      product.productType = productType._id; // Store only the ID
-    }
-
-    // **Handle file updates**
-    if (req.files?.logo?.[0]?.path) {
-      product.logoUrl = req.files.logo[0].path;
-    }
-
-    // **Process image updates**
-    const newImages = req.files?.productImages?.map((f) => f.path) || [];
-    product.imagesUrls = [
-      ...product.imagesUrls.filter((img) => !removeImages.includes(img)),
-      ...newImages,
-    ];
-
-    // **Process video updates**
-    const newVideos = req.files?.productVideos?.map((f) => f.path) || [];
-    product.videosUrls = [
-      ...product.videosUrls.filter((vid) => !removeVideos.includes(vid)),
-      ...newVideos,
-    ];
-
-    // **Update core fields**
-    if (title) product.title = title;
-    if (description) product.description = description;
-    if (price !== undefined) {
-      const parsedPrice = parseFloat(price);
+    // Price
+    if (req.body.price !== undefined) {
+      const parsedPrice = parseFloat(req.body.price);
       if (isNaN(parsedPrice)) {
         const error = new Error('Invalid price value');
         error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
@@ -257,8 +142,10 @@ exports.editProduct = async (req, res, next) => {
       }
       product.price = parsedPrice;
     }
-    if (weight !== undefined) {
-      const parsedWeight = parseFloat(weight);
+
+    // Weight
+    if (req.body.weight !== undefined) {
+      const parsedWeight = parseFloat(req.body.weight);
       if (isNaN(parsedWeight)) {
         const error = new Error('Invalid weight value');
         error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
@@ -266,8 +153,67 @@ exports.editProduct = async (req, res, next) => {
       }
       product.weight = parsedWeight;
     }
-    product.lastEditor = admin._id;
-    product.updatedAt = Date.now();
+
+    // Product Type
+    if (req.body.productTypeId !== undefined) {
+      if (!mongoose.Types.ObjectId.isValid(req.body.productTypeId)) {
+        const error = new Error('Invalid product type ID');
+        error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
+        throw error;
+      }
+      const productType = await ProductType.findById(req.body.productTypeId);
+      if (!productType) {
+        const error = new Error('Product type not found');
+        error.statusCode = StatusCodes.NOT_FOUND;
+        throw error;
+      }
+      product.productType = productType._id;
+    }
+
+    // **Handle replacements**
+    // Sizes
+    if (req.body.availableSizes !== undefined) {
+      if (!Array.isArray(req.body.availableSizes)) {
+        const error = new Error('availableSizes must be an array');
+        error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
+        throw error;
+      }
+
+      const numericSizes = req.body.availableSizes.map((size) => {
+        const parsed = Number(size);
+        if (isNaN(parsed)) {
+          const error = new Error(`Invalid size value: ${size}`);
+          error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
+          throw error;
+        }
+        return parsed;
+      });
+
+      product.availableSizes = [...new Set(numericSizes)].sort((a, b) => a - b);
+    }
+
+    // Images
+    if (req.body.imagesUrls !== undefined) {
+      if (!Array.isArray(req.body.imagesUrls)) {
+        const error = new Error('imagesUrls must be an array');
+        error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
+        throw error;
+      }
+      product.imagesUrls = req.body.imagesUrls;
+    }
+
+    // Videos
+    if (req.body.videosUrls !== undefined) {
+      if (!Array.isArray(req.body.videosUrls)) {
+        const error = new Error('videosUrls must be an array');
+        error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
+        throw error;
+      }
+      product.videosUrls = req.body.videosUrls;
+    }
+
+    // Logo
+    if (req.body.logoUrl !== undefined) product.logoUrl = req.body.logoUrl;
 
     // **Validate minimum images**
     if (product.imagesUrls.length === 0) {
@@ -276,21 +222,26 @@ exports.editProduct = async (req, res, next) => {
       throw error;
     }
 
+    // **Update metadata**
+    product.lastEditor = admin._id;
+    product.updatedAt = Date.now();
+
     // **Save updates**
     const updatedProduct = await product.save();
 
-    // **Cleanup old files**
-    await Promise.all([
-      oldFiles.logo && product.logoUrl !== oldFiles.logo
-        ? fs.unlink(oldFiles.logo).catch(() => {})
-        : null,
-      ...oldFiles.images
-        .filter((img) => !product.imagesUrls.includes(img))
-        .map((img) => fs.unlink(img).catch(() => {})),
-      ...oldFiles.videos
-        .filter((vid) => !product.videosUrls.includes(vid))
-        .map((vid) => fs.unlink(vid).catch(() => {})),
-    ]);
+    // **Determine changes**
+    const changes = {
+      sizes:
+        JSON.stringify(originalState.sizes) !==
+        JSON.stringify(updatedProduct.availableSizes),
+      images:
+        JSON.stringify(originalState.images) !==
+        JSON.stringify(updatedProduct.imagesUrls),
+      videos:
+        JSON.stringify(originalState.videos) !==
+        JSON.stringify(updatedProduct.videosUrls),
+      logo: originalState.logo !== updatedProduct.logoUrl,
+    };
 
     // **Success response**
     res.status(StatusCodes.OK).json({
@@ -298,35 +249,17 @@ exports.editProduct = async (req, res, next) => {
       message: 'Product updated successfully',
       productId: updatedProduct._id,
       changes: {
-        logoUpdated: !!req.files?.logo,
-        images: {
-          added: newImages.length,
-          removed: removeImages.length,
-        },
-        videos: {
-          added: newVideos.length,
-          removed: removeVideos.length,
-        },
-        sizes: {
-          updated: sizeChanges.hadChanges,
-          added: sizeChanges.added,
-          removed: sizeChanges.removed,
-        },
-        timestamp: new Date().toISOString(),
+        sizesUpdated: changes.sizes,
+        imagesUpdated: changes.images,
+        videosUpdated: changes.videos,
+        logoUpdated: changes.logo,
+        newSizes: updatedProduct.availableSizes,
+        imageCount: updatedProduct.imagesUrls.length,
+        videoCount: updatedProduct.videosUrls.length,
       },
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    // **Cleanup new files on error**
-    if (req.files) {
-      await Promise.all(
-        [
-          ...(req.files.logo || []).map((f) => fs.unlink(f.path)),
-          ...(req.files.productImages || []).map((f) => fs.unlink(f.path)),
-          ...(req.files.productVideos || []).map((f) => fs.unlink(f.path)),
-        ].map((p) => p.catch(() => {}))
-      );
-    }
-
     // **Error handling**
     if (!error.statusCode) {
       error.statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
@@ -346,7 +279,6 @@ exports.editProduct = async (req, res, next) => {
     });
   }
 };
-
 exports.deleteProduct = async (req, res, next) => {
   try {
     // Authentication
