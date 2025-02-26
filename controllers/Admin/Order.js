@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { StatusCodes } = require('http-status-codes');
 const Order = require('../../models/Order');
 const { OrderStatus } = require('../../util/types');
+const { ensureIsAdmin } = require('../../util/ensureIsAdmin');
 
 exports.getOrderStatuses = async (req, res) => {
   res.status(200).json(OrderStatus);
