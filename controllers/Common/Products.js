@@ -84,7 +84,7 @@ exports.getProducts = async (req, res, next) => {
     const [products, totalCount] = await Promise.all([
       Product.find(filter)
         .select(
-          '_id title description price weight productType logoUrl imagesUrls videosUrls createdAt'
+          '_id title description price weight productType logo images videos createdAt'
         )
         .populate({
           path: 'productType',
@@ -171,7 +171,7 @@ exports.getOneProduct = async (req, res, next) => {
     // Fetch the product by ID
     const product = await Product.findById(productId)
       .select(
-        '_id title description price weight availableSizes logoUrl imagesUrls videosUrls productType creator lastEditor createdAt updatedAt'
+        '_id title description price weight availableSizes logo images videos productType creator lastEditor createdAt updatedAt'
       )
       .populate({
         path: 'productType',
@@ -311,8 +311,8 @@ exports.getBestSellers = async (req, res, next) => {
           price: '$productDetails.price',
           image: {
             $cond: {
-              if: { $isArray: '$productDetails.imagesUrls' },
-              then: { $arrayElemAt: ['$productDetails.imagesUrls', 0] },
+              if: { $isArray: '$productDetails.images' },
+              then: { $arrayElemAt: ['$productDetails.images', 0] },
               else: null,
             },
           },

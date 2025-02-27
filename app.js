@@ -18,6 +18,7 @@ const OperatorRoutes = require('./routes/Operator');
 const CustomerRoutes = require('./routes/Customer');
 const CommonRoutes = require('./routes/Common');
 const PaymentRoutes = require('./routes/Payment');
+const CloudinaryRoutes = require('./routes/CloudinaryUploads');
 
 const connectToDatabase = require('./database/connection');
 
@@ -53,18 +54,19 @@ app.use((req, res, next) => {
 });
 
 app.use('/admin', AdminRoutes);
+app.use('/admin', CloudinaryRoutes);
 app.use('/operator', OperatorRoutes);
 app.use('/customer', CustomerRoutes);
 app.use(CommonRoutes);
 app.use(PaymentRoutes);
 
 app.use((req, res, next) => {
-  if (req.files) {
-    const files = req.files;
-    files.map((file) => {
-      unlink(file.path);
-    });
-  }
+  // if (req.files) {
+  //   const files = req.files;
+  //   files.map((file) => {
+  //     unlink(file.path);
+  //   });
+  // }
   res.status(404).json({ message: 'Page not found!' });
 });
 

@@ -73,13 +73,13 @@ exports.checkout = async (req, res) => {
     let totalProductPrice = 0;
     let totalWeight = 0;
     const cartItems = customer.cart.map((item) => {
-      totalProductPrice += item.product.price * item.quantity;
-      totalWeight += item.product.weight * item.quantity;
+      totalProductPrice += item?.product?.price * item?.quantity;
+      totalWeight += item?.product?.weight * item?.quantity;
       return {
-        product: item.product._id,
-        price: item.product.price,
-        size: item.size,
-        quantity: item.quantity,
+        product: item?.product?._id,
+        price: item?.product?.price,
+        size: item?.size,
+        quantity: item?.quantity,
       };
     });
 
@@ -228,14 +228,14 @@ exports.createOrder = async (req, res) => {
     let totalProductPrice = 0;
     let totalWeight = 0;
     const cartItems = customer.cart.map((item) => {
-      totalProductPrice += item.product.price * item.quantity;
-      totalWeight += item.product.weight * item.quantity;
+      totalProductPrice += item?.product?.price * item?.quantity;
+      totalWeight += item?.product?.weight * item?.quantity;
       return {
-        product: item.product._id,
-        price: item.product.price,
-        size: item.size,
-        quantity: item.quantity,
-        notes: item.notes || '',
+        product: item?.product?._id,
+        price: item?.product?.price,
+        size: item?.size,
+        quantity: item?.quantity,
+        notes: item?.notes || '',
       };
     });
 
@@ -270,7 +270,6 @@ exports.createOrder = async (req, res) => {
             )
           : coupon.discount;
     }
-
     const totalAmount = parseFloat(
       (totalProductPrice - discount + deliveryCost).toFixed(3)
     );

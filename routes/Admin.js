@@ -41,23 +41,23 @@ const {
   resetPassword,
 } = require('../controllers/Admin/ResetPassword');
 
-router.post(
-  '/upload/image',
-  multerMiddleware([
-    { name: 'image', maxCount: 1 }, // Single image
-  ]),
-  isAuth,
-  uploadImage
-);
+// router.post(
+//   '/upload/image',
+//   multerMiddleware([
+//     { name: 'image', maxCount: 1 }, // Single image
+//   ]),
+//   isAuth,
+//   uploadImage
+// );
 
-router.post(
-  '/upload/video',
-  multerMiddleware([
-    { name: 'video', maxCount: 1 }, // Single image
-  ]),
-  isAuth,
-  uploadVideo
-);
+// router.post(
+//   '/upload/video',
+//   multerMiddleware([
+//     { name: 'video', maxCount: 1 }, // Single image
+//   ]),
+//   isAuth,
+//   uploadVideo
+// );
 
 router.post('/admin', multerGlobal, createAdmin);
 

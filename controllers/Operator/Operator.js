@@ -79,7 +79,6 @@ exports.getOrders = async (req, res) => {
       isUrgent,
       isPaid,
     } = req.query;
-    console.log(req.query);
 
     // Build filter object
     const filter = {};

@@ -1,9 +1,9 @@
 const unlinkAsync = require('../../util/unlinkAsync');
 const { StatusCodes } = require('http-status-codes');
 const mongoose = require('mongoose');
+const cloudinary = require('../../util/cloudinaryConfig');
 
 // Models
-const Admin = require('../../models/Admin');
 const Product = require('../../models/Product');
 const ProductType = require('../../models/ProductType');
 const { ensureIsAdmin } = require('../../util/ensureIsAdmin');
@@ -20,10 +20,11 @@ exports.addProduct = async (req, res, next) => {
       weight,
       availableSizes,
       productTypeId,
-      logoUrl = '',
-      imagesUrls = [],
-      videosUrls = [],
+      logo = { url: '', publicId: '' }, // Default to empty object
+      images = [], // Array of { url, publicId }
+      videos = [], // Array of { url, publicId }
     } = req.body;
+
     // Validate 'productTypeId'
     if (!mongoose.Types.ObjectId.isValid(productTypeId)) {
       const error = new Error('Invalid product type ID');
@@ -39,32 +40,30 @@ exports.addProduct = async (req, res, next) => {
       throw error;
     }
 
-    if (imagesUrls.length === 0) {
+    // Validate at least one image is provided
+    if (images.length === 0) {
       const error = new Error('Provide at least one image.');
       error.statusCode = 422;
       throw error;
     }
-    const normalizeUrl = (url) => {
-      if (!url) return ''; // Return empty string if URL is falsy
-      return url.replace(/\\/g, '/'); // Replace backslashes with forward slashes
+
+    // Normalize URLs and ensure proper structure
+    const normalizeMedia = (media) => {
+      if (!media || !media.url) return { url: '', publicId: '' }; // Default to empty object
+      return {
+        url: media.url.replace(/\\/g, '/'), // Replace backslashes with forward slashes
+        publicId: media.publicId || '', // Ensure publicId is included
+      };
     };
 
-    // Normalize logo URL (handle undefined or empty string)
-    const normalizedLogoUrl = normalizeUrl(logoUrl);
+    // Normalize logo
+    const normalizedLogo = normalizeMedia(logo);
 
-    // Normalize images URLs (handle single string or array)
-    const normalizedImagesUrls = Array.isArray(imagesUrls)
-      ? imagesUrls.map(normalizeUrl) // If it's an array, map over it
-      : imagesUrls // If it's a single string
-      ? [normalizeUrl(imagesUrls)] // Convert it to an array with one normalized URL
-      : []; // If it's undefined or empty, default to an empty array
+    // Normalize images (ensure each image has url and publicId)
+    const normalizedImages = images.map((image) => normalizeMedia(image));
 
-    // Normalize videos URLs (handle single string or array)
-    const normalizedVideosUrls = Array.isArray(videosUrls)
-      ? videosUrls.map(normalizeUrl) // If it's an array, map over it
-      : videosUrls // If it's a single string
-      ? [normalizeUrl(videosUrls)] // Convert it to an array with one normalized URL
-      : []; // If it's undefined or empty, default to an empty array
+    // Normalize videos (ensure each video has url and publicId)
+    const normalizedVideos = videos.map((video) => normalizeMedia(video));
 
     // Create a new product
     const product = new Product({
@@ -75,9 +74,9 @@ exports.addProduct = async (req, res, next) => {
       weight: parseFloat(weight),
       creator: admin._id,
       lastEditor: admin._id,
-      logoUrl: normalizedLogoUrl,
-      imagesUrls: normalizedImagesUrls,
-      videosUrls: normalizedVideosUrls,
+      logo: normalizedLogo, // Store logo as { url, publicId }
+      images: normalizedImages, // Store images as [{ url, publicId }]
+      videos: normalizedVideos, // Store videos as [{ url, publicId }]
       productType: productType._id, // Store only the ID
     });
 
@@ -96,7 +95,7 @@ exports.addProduct = async (req, res, next) => {
     next(err);
   }
 };
-const fs = require('fs').promises; // For unlinking files asynchronously
+
 exports.editProduct = async (req, res, next) => {
   try {
     // **Authentication & Authorization**
@@ -118,12 +117,11 @@ exports.editProduct = async (req, res, next) => {
       throw error;
     }
 
-    // **Store original state for comparison**
+    // **Store original state for comparison and cleanup**
     const originalState = {
-      sizes: [...product.availableSizes],
-      images: [...product.imagesUrls],
-      videos: [...product.videosUrls],
-      logo: product.logoUrl,
+      logo: { ...product.logo }, // Store logo object
+      images: [...product.images], // Store images array
+      videos: [...product.videos], // Store videos array
     };
 
     // **Process updates**
@@ -192,31 +190,89 @@ exports.editProduct = async (req, res, next) => {
       product.availableSizes = [...new Set(numericSizes)].sort((a, b) => a - b);
     }
 
-    // Images
-    if (req.body.imagesUrls !== undefined) {
-      if (!Array.isArray(req.body.imagesUrls)) {
-        const error = new Error('imagesUrls must be an array');
+    // Logo
+    if (req.body.logo !== undefined) {
+      // Validate logo structure
+      if (!req.body.logo.url || !req.body.logo.publicId) {
+        const error = new Error('Logo must have both url and publicId');
         error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
         throw error;
       }
-      product.imagesUrls = req.body.imagesUrls;
+
+      // Delete old logo from Cloudinary if it exists and is being replaced
+      if (
+        originalState.logo.publicId &&
+        originalState.logo.publicId !== req.body.logo.publicId
+      ) {
+        await cloudinary.uploader.destroy(originalState.logo.publicId);
+      }
+
+      product.logo = req.body.logo;
+    }
+
+    // Images
+    if (req.body.images !== undefined) {
+      if (!Array.isArray(req.body.images)) {
+        const error = new Error('images must be an array');
+        error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
+        throw error;
+      }
+
+      // Validate each image structure
+      for (const img of req.body.images) {
+        if (!img.url || !img.publicId) {
+          const error = new Error('Each image must have both url and publicId');
+          error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
+          throw error;
+        }
+      }
+
+      // Delete old images from Cloudinary that are not in the new list
+      const newImagePublicIds = req.body.images.map((img) => img.publicId);
+      const imagesToDelete = originalState.images.filter(
+        (img) => !newImagePublicIds.includes(img.publicId)
+      );
+      await Promise.all(
+        imagesToDelete.map((img) => cloudinary.uploader.destroy(img.publicId))
+      );
+
+      product.images = req.body.images;
     }
 
     // Videos
-    if (req.body.videosUrls !== undefined) {
-      if (!Array.isArray(req.body.videosUrls)) {
-        const error = new Error('videosUrls must be an array');
+    if (req.body.videos !== undefined) {
+      if (!Array.isArray(req.body.videos)) {
+        const error = new Error('videos must be an array');
         error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
         throw error;
       }
-      product.videosUrls = req.body.videosUrls;
+
+      // Validate each video structure
+      for (const vid of req.body.videos) {
+        if (!vid.url || !vid.publicId) {
+          const error = new Error('Each video must have both url and publicId');
+          error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
+          throw error;
+        }
+      }
+
+      // Delete old videos from Cloudinary that are not in the new list
+      const newVideoPublicIds = req.body.videos.map((vid) => vid.publicId);
+      const videosToDelete = originalState.videos.filter(
+        (vid) => !newVideoPublicIds.includes(vid.publicId)
+      );
+
+      await Promise.all(
+        videosToDelete.map((vid) =>
+          cloudinary.uploader.destroy(vid.publicId, { resource_type: 'video' })
+        )
+      );
+
+      product.videos = req.body.videos;
     }
 
-    // Logo
-    if (req.body.logoUrl !== undefined) product.logoUrl = req.body.logoUrl;
-
     // **Validate minimum images**
-    if (product.imagesUrls.length === 0) {
+    if (product.images.length === 0) {
       const error = new Error('Product must have at least one image');
       error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
       throw error;
@@ -236,11 +292,13 @@ exports.editProduct = async (req, res, next) => {
         JSON.stringify(updatedProduct.availableSizes),
       images:
         JSON.stringify(originalState.images) !==
-        JSON.stringify(updatedProduct.imagesUrls),
+        JSON.stringify(updatedProduct.images),
       videos:
         JSON.stringify(originalState.videos) !==
-        JSON.stringify(updatedProduct.videosUrls),
-      logo: originalState.logo !== updatedProduct.logoUrl,
+        JSON.stringify(updatedProduct.videos),
+      logo:
+        JSON.stringify(originalState.logo) !==
+        JSON.stringify(updatedProduct.logo),
     };
 
     // **Success response**
@@ -254,8 +312,8 @@ exports.editProduct = async (req, res, next) => {
         videosUpdated: changes.videos,
         logoUpdated: changes.logo,
         newSizes: updatedProduct.availableSizes,
-        imageCount: updatedProduct.imagesUrls.length,
-        videoCount: updatedProduct.videosUrls.length,
+        imageCount: updatedProduct.images.length,
+        videoCount: updatedProduct.videos.length,
       },
       timestamp: new Date().toISOString(),
     });
@@ -292,21 +350,22 @@ exports.deleteProduct = async (req, res, next) => {
       error.statusCode = StatusCodes.NOT_FOUND;
       throw error;
     }
+    if (product?.logo?.publicId)
+      await cloudinary.uploader.destroy(product.logo.publicId);
 
-    // Collect all file paths for cleanup
-    const filesToDelete = [
-      product.logoUrl,
-      ...product.imagesUrls,
-      ...product.videosUrls,
-    ].filter((path) => path && path !== '');
-
-    // Delete associated files
     await Promise.all(
-      filesToDelete.map((path) =>
-        unlinkAsync(path).catch((error) => {
-          console.error(`File cleanup error for ${path}:`, error.message);
-        })
-      )
+      product.images.map((img) => {
+        if (img.publicId) cloudinary.uploader.destroy(img?.publicId);
+      })
+    );
+    await Promise.all(
+      product.videos.map((video) => {
+        if (video.publicId) {
+          return cloudinary.uploader.destroy(video.publicId, {
+            resource_type: 'video', // Explicitly set resource_type to 'video'
+          });
+        }
+      })
     );
     // Delete from database
     await Product.deleteOne({ _id: productId });
@@ -315,7 +374,6 @@ exports.deleteProduct = async (req, res, next) => {
       success: true,
       message: 'Product and associated files deleted successfully',
       deletedProductId: productId,
-      deletedFilesCount: filesToDelete.length,
     });
   } catch (err) {
     // Error handling

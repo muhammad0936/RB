@@ -21,18 +21,20 @@ const productSchema = new Schema(
         required: true,
       },
     ],
-    logoUrl: {
-      type: String,
+    logo: {
+      url: String, // Cloudinary URL
+      publicId: String, // Cloudinary public_id
     },
-    imagesUrls: [
+    images: [
       {
-        type: String,
-        required: true,
+        url: String, // Cloudinary URL
+        publicId: String, // Cloudinary public_id
       },
     ],
-    videosUrls: [
+    videos: [
       {
-        type: String,
+        url: String, // Cloudinary URL
+        publicId: String, // Cloudinary public_id
       },
     ],
     productType: {
