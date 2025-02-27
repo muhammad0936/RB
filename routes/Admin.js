@@ -45,6 +45,7 @@ const {
   createOrder,
   removeFromCustomerCart,
   getCustomerCart,
+  changeCartItemQuantity,
 } = require('../controllers/Admin/CustoemerOrder');
 
 // router.post(
@@ -136,6 +137,13 @@ router.get('/operators', multerGlobal, isAuth, getOperators);
 router.post('/customerCart', multerGlobal, isAuth, addToCartByAdmin);
 
 router.delete('/customerCart', multerGlobal, isAuth, removeFromCustomerCart);
+
+router.delete(
+  '/customerChangeItemQuantity',
+  multerGlobal,
+  isAuth,
+  changeCartItemQuantity
+);
 
 router.get('/customerCart', multerGlobal, isAuth, getCustomerCart);
 

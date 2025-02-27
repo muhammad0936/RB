@@ -167,6 +167,94 @@ exports.removeFromCart = async (req, res, next) => {
   }
 };
 
+exports.changeCartItemQuantity = async (req, res, next) => {
+  try {
+    const { itemId, quantityChange } = req.body;
+    const customerId = req.userId;
+
+    // Validate quantityChange
+    console.log(req.body);
+    if (typeof quantityChange !== 'number' || quantityChange === 0) {
+      const error = new Error(
+        'Invalid quantityChange value. It must be a non-zero number.'
+      );
+      error.statusCode = StatusCodes.BAD_REQUEST;
+      throw error;
+    }
+
+    // Fetch the customer
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
+      const error = new Error('Customer not found.');
+      error.statusCode = StatusCodes.NOT_FOUND;
+      throw error;
+    }
+
+    // Find the item in the cart
+    const cartItem = customer.cart.find(
+      (item) => item._id.toString() === itemId
+    );
+
+    // Check if the item exists in the cart
+    if (!cartItem) {
+      const error = new Error('Item not found in the cart.');
+      error.statusCode = StatusCodes.NOT_FOUND;
+      throw error;
+    }
+
+    // Calculate the new quantity
+    const newQuantity = cartItem.quantity + quantityChange;
+
+    // Validate the new quantity
+    if (newQuantity < 1) {
+      // Remove the item if the new quantity is less than 1
+      customer.cart = customer.cart.filter(
+        (item) => item._id.toString() !== itemId
+      );
+    } else {
+      // Update the quantity
+      cartItem.quantity = newQuantity;
+    }
+
+    // Save the updated customer document
+    await customer.save();
+
+    // Send success response
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message:
+        newQuantity >= 1
+          ? 'Item quantity updated successfully.'
+          : 'Item removed from cart successfully.',
+      cart: customer.cart,
+    });
+  } catch (error) {
+    // Error handling
+    if (!error.statusCode) {
+      error.statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
+    }
+
+    console.error(`Change Cart Item Quantity Error: ${error.message}`, {
+      itemId: req.body.itemId,
+      quantityChange: req.body.quantityChange,
+      customerId: req.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    res.status(error.statusCode).json({
+      success: false,
+      message: error.message,
+      errorDetails:
+        process.env.NODE_ENV === 'development'
+          ? {
+              stack: error.stack,
+              code: error.code,
+            }
+          : undefined,
+    });
+  }
+};
+
 exports.getCart = async (req, res, next) => {
   try {
     const customerId = req.userId; // Assuming the customer ID is stored in req.userId after authentication

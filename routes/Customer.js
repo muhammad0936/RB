@@ -7,6 +7,8 @@ const {
   addToCart,
   removeFromCart,
   getCart,
+  changeCartItemQuantityartItemQuantity,
+  changeCartItemQuantity,
 } = require('../controllers/Customer/Cart');
 const {
   getOrders,
@@ -30,6 +32,13 @@ router.post('/resetPassword', multerGlobal, resetPassword);
 router.post('/cart', multerGlobal, isAuth, addToCart);
 
 router.delete('/cart', multerGlobal, isAuth, removeFromCart);
+
+router.delete(
+  '/changeItemQuantity',
+  multerGlobal,
+  isAuth,
+  changeCartItemQuantity
+);
 
 router.get('/cart', isAuth, getCart);
 
