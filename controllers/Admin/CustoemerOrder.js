@@ -484,16 +484,11 @@ exports.createOrder = async (req, res) => {
     // Clear cart (optional)
     // await Customer.findByIdAndUpdate(customer._id, { cart: [] });
 
-    // Send payment URL to the customer (e.g., via SMS or email)
-    // Example: Send SMS or email with the payment URL
-    // sendSms(customer.phone, `Please complete your payment: ${updatedOrder.paymentUrl}`);
-    // sendEmail(customer.email, 'Payment Link', `Please complete your payment: ${updatedOrder.paymentUrl}`);
-
     res.status(StatusCodes.OK).json({
       success: true,
       paymentUrl: updatedOrder.paymentUrl,
       orderId: updatedOrder._id,
-      message: 'Order created successfully. Payment URL sent to the customer.',
+      message: 'Order created successfully.',
     });
   } catch (error) {
     // Cleanup temporary order on error
