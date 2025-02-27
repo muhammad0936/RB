@@ -6,7 +6,10 @@ const productTypeSchema = new Schema({
     type: String,
     required: true,
   },
-  imageUrl: String,
+  image: {
+    url: String, // Cloudinary URL
+    publicId: String, // Cloudinary public_id
+  },
   parentProductType: {
     type: Schema.Types.ObjectId,
     ref: 'ProductType',

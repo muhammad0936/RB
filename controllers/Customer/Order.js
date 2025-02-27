@@ -515,7 +515,7 @@ exports.getOneOrder = async (req, res) => {
         notes: order.deliveryAddress.notes || '',
       },
       products: order.products.map((item) => ({
-        title: item.product.title,
+        title: item.product?.title,
         quantity: item.quantity,
         price: item.price,
         size: item.size,

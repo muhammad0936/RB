@@ -51,7 +51,7 @@ exports.addToCart = async (req, res, next) => {
     // Check if the product is already in the cart
     const existingCartItem = customer.cart.find(
       (item) =>
-        item.product.toString() === productId &&
+        item.product?.toString() === productId &&
         +item.size === +size &&
         item.notes === notes
     );
@@ -133,7 +133,7 @@ exports.removeFromCart = async (req, res, next) => {
     // Find the index of the item in the cart
     const itemIndex = customer.cart.findIndex(
       (item) =>
-        item.product.toString() === productId &&
+        item.product?.toString() === productId &&
         item.size === +size &&
         item.notes === notes
     );
@@ -191,7 +191,7 @@ exports.getCart = async (req, res, next) => {
     const customer = await Customer.findById(customerId)
       .populate({
         path: 'cart.product',
-        select: 'title price imagesUrls productType',
+        select: 'title price images productType',
         populate: {
           path: 'productType',
           select: 'name parentProductType',
@@ -211,7 +211,7 @@ exports.getCart = async (req, res, next) => {
 
     // Calculate the total price of the cart
     const totalPrice = customer.cart.reduce((total, item) => {
-      total + item.product.price * item.quantity;
+      total + item.product?.price * item.quantity;
     }, 0);
 
     // Send success response

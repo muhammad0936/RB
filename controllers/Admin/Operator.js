@@ -25,17 +25,15 @@ exports.addOperator = async (req, res) => {
     });
     await newOperator.save();
 
-    res
-      .status(201)
-      .json({
-        message: 'Operator added successfully',
-        operator: {
-          id: newOperator._id,
-          name: newOperator.name,
-          email: newOperator.email,
-          phone: newOperator.phone,
-        },
-      });
+    res.status(201).json({
+      message: 'Operator added successfully',
+      operator: {
+        id: newOperator._id,
+        name: newOperator.name,
+        email: newOperator.email,
+        phone: newOperator.phone,
+      },
+    });
   } catch (error) {
     res
       .status(500)
@@ -64,18 +62,42 @@ exports.deleteOperator = async (req, res) => {
 exports.getOperators = async (req, res) => {
   try {
     const admin = await ensureIsAdmin(req.userId);
-    const { name, email, phone } = req.query;
+    const { name, email, phone, page = 1, limit = 10 } = req.query;
     const filters = {};
 
+    // Filters
     if (name) filters.name = new RegExp(name, 'i'); // Case-insensitive search
     if (email) filters.email = email;
     if (phone) filters.phone = phone;
 
-    const operators = await Operator.find(filters);
-    res.status(200).json({ operators });
+    // Pagination
+    const skip = (page - 1) * limit;
+    const total = await Operator.countDocuments(filters);
+
+    const operators = await Operator.find(filters)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 });
+
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+
+    res.status(200).json({
+      success: true,
+      count: operators.length,
+      data: operators,
+      pagination: {
+        totalOperators: total, // Total number of operators
+        currentPage: parseInt(page),
+        totalPages: totalPages,
+        hasNextPage: hasNextPage,
+      },
+    });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: 'Error fetching operators', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching operators',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
   }
 };

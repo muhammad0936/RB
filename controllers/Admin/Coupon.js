@@ -166,12 +166,19 @@ exports.getCoupons = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+
     res.status(StatusCodes.OK).json({
       success: true,
       count: coupons.length,
-      total,
-      pages: Math.ceil(total / limit),
       data: coupons,
+      pagination: {
+        totalCoupons: total, // Changed from totalOrders to totalCoupons
+        currentPage: parseInt(page),
+        totalPages: totalPages,
+        hasNextPage: hasNextPage,
+      },
     });
   } catch (error) {
     console.error('Get Coupons Error:', error.message);

@@ -8,7 +8,7 @@ const { ensureIsAdmin } = require('../../util/ensureIsAdmin');
 exports.addProductType = async (req, res, next) => {
   try {
     const admin = await ensureIsAdmin(req.userId);
-    const { name, imageUrl, parentProductTypeId } = req.body;
+    const { name, image, parentProductTypeId } = req.body;
 
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -17,11 +17,15 @@ exports.addProductType = async (req, res, next) => {
       throw error;
     }
 
-    // Validate image URL format
-    if (imageUrl && typeof imageUrl !== 'string') {
-      const error = new Error('Invalid image URL format');
-      error.statusCode = 422;
-      throw error;
+    // Validate image object if provided
+    if (image) {
+      if (typeof image !== 'object' || !image.url || !image.publicId) {
+        const error = new Error(
+          'Invalid image format. Must include `url` and `publicId`.'
+        );
+        error.statusCode = 422;
+        throw error;
+      }
     }
 
     // Validate parent product type ID if provided
@@ -56,7 +60,7 @@ exports.addProductType = async (req, res, next) => {
     // Create new product type
     const productType = new ProductType({
       name: name.trim(),
-      imageUrl: imageUrl || null,
+      image: image || null, // Store image object (with url and publicId)
       parentProductType: parentProductTypeId || null,
     });
 
@@ -67,7 +71,7 @@ exports.addProductType = async (req, res, next) => {
       productType: {
         _id: savedProductType._id,
         name: savedProductType.name,
-        imageUrl: savedProductType.imageUrl,
+        image: savedProductType.image,
         parentProductType: savedProductType.parentProductType,
         createdAt: savedProductType.createdAt,
       },

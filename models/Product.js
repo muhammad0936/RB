@@ -21,7 +21,7 @@ const productSchema = new Schema(
         required: true,
       },
     ],
-    logo: {
+    image: {
       url: String, // Cloudinary URL
       publicId: String, // Cloudinary public_id
     },
