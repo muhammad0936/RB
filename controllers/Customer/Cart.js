@@ -106,21 +106,8 @@ exports.addToCart = async (req, res, next) => {
 
 exports.removeFromCart = async (req, res, next) => {
   try {
-    const { productId, size, notes } = req.body;
-    const customerId = req.userId; // Assuming the customer ID is stored in req.userId after authentication
-
-    // Validate input
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      const error = new Error('Invalid product ID.');
-      error.statusCode = StatusCodes.BAD_REQUEST;
-      throw error;
-    }
-
-    if (!size) {
-      const error = new Error('Size is required.');
-      error.statusCode = StatusCodes.BAD_REQUEST;
-      throw error;
-    }
+    const { itemId } = req.body;
+    const customerId = req.userId;
 
     // Fetch the customer
     const customer = await Customer.findById(customerId);
@@ -132,10 +119,7 @@ exports.removeFromCart = async (req, res, next) => {
 
     // Find the index of the item in the cart
     const itemIndex = customer.cart.findIndex(
-      (item) =>
-        item.product?.toString() === productId &&
-        item.size === +size &&
-        item.notes === notes
+      (item) => item._id.toString() === itemId
     );
 
     // Check if the item exists in the cart
@@ -164,7 +148,7 @@ exports.removeFromCart = async (req, res, next) => {
     }
 
     console.error(`Remove from Cart Error: ${error.message}`, {
-      productId: req.body.productId,
+      // productId: removedProductId,
       customerId: req.userId,
       timestamp: new Date().toISOString(),
     });

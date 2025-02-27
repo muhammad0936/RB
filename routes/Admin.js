@@ -40,6 +40,12 @@ const {
   requestPasswordReset,
   resetPassword,
 } = require('../controllers/Admin/ResetPassword');
+const {
+  addToCartByAdmin,
+  createOrder,
+  removeFromCustomerCart,
+  getCustomerCart,
+} = require('../controllers/Admin/CustoemerOrder');
 
 // router.post(
 //   '/upload/image',
@@ -126,4 +132,12 @@ router.post('/operator', multerGlobal, isAuth, addOperator);
 router.delete('/operator/:id', isAuth, deleteOperator);
 
 router.get('/operators', multerGlobal, isAuth, getOperators);
+
+router.post('/customerCart', multerGlobal, isAuth, addToCartByAdmin);
+
+router.delete('/customerCart', multerGlobal, isAuth, removeFromCustomerCart);
+
+router.get('/customerCart', multerGlobal, isAuth, getCustomerCart);
+
+router.post('/customerOrder', multerGlobal, isAuth, createOrder);
 module.exports = router;

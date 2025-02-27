@@ -84,7 +84,7 @@ exports.getProducts = async (req, res, next) => {
     const [products, totalCount] = await Promise.all([
       Product.find(filter)
         .select(
-          '_id title description price weight productType logo images videos createdAt'
+          '_id title description price availableSizes weight productType logo images videos createdAt'
         )
         .populate({
           path: 'productType',
