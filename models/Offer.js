@@ -16,12 +16,17 @@ const offerSchema = new Schema(
           type: Number,
           required: true,
         },
-        expirationDate: {
-          type: Date,
-          required: true,
-        },
+        notes: String,
       },
     ],
+    expirationDate: {
+      type: Date,
+      required: true,
+    },
+    numberOfProductsHaveToBuy: {
+      type: Number,
+      required: true,
+    },
   },
   {
     timestamps: true,

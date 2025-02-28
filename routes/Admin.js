@@ -47,6 +47,14 @@ const {
   getCustomerCart,
   changeCartItemQuantity,
 } = require('../controllers/Admin/CustoemerOrder');
+const {
+  createOffer,
+  updateOffer,
+  deleteOffer,
+  manageProducts,
+  getOffers,
+  getOneOffer,
+} = require('../controllers/Admin/Offer');
 
 // router.post(
 //   '/upload/image',
@@ -148,4 +156,16 @@ router.delete(
 router.get('/customerCart', multerGlobal, isAuth, getCustomerCart);
 
 router.post('/customerOrder', multerGlobal, isAuth, createOrder);
+
+router.post('/offer', multerGlobal, isAuth, createOffer);
+
+router.put('/offer/:id', multerGlobal, isAuth, updateOffer);
+
+router.delete('/offer/:id', multerGlobal, isAuth, deleteOffer);
+
+router.put('/manageOfferProducts/:id', multerGlobal, isAuth, manageProducts);
+
+router.get('/offers', multerGlobal, isAuth, getOffers);
+
+router.get('/offer/:id', multerGlobal, isAuth, getOneOffer);
 module.exports = router;
