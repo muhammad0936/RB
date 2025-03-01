@@ -9,7 +9,7 @@ exports.createTempOrder = async (req, res) => {
   try {
     const adminId = req.userId;
     await ensureIsAdmin(adminId);
-    const { adminNotes, customerPhone } = req.body;
+    const { adminNotes, customerPhone, isUrgent } = req.body;
 
     // Get customer with populated cart
     const customer = await Customer.exists({ phone: customerPhone });
@@ -54,6 +54,7 @@ exports.createTempOrder = async (req, res) => {
       customerPhone,
       adminNotes,
       creator: admin._id,
+      isUrgent: isUrgent == true,
     });
     const customerUrl = `<completeOrderProcess_frontend_URL>?tempOrderId=${tempOrder._id}`;
     tempOrder.customerUrl = customerUrl;
@@ -91,7 +92,9 @@ exports.createTempOrder = async (req, res) => {
 exports.getTempOrders = async (req, res) => {
   try {
     const tempOrders = await TempOrder.find()
-      .select('customerPhone customerUrl products adminNotes creator createdAt')
+      .select(
+        'customerPhone customerUrl isUrgent products adminNotes creator createdAt'
+      )
       .populate('creator', 'name')
       .lean();
 
@@ -99,6 +102,7 @@ exports.getTempOrders = async (req, res) => {
       _id: order._id,
       customerPhone: order.customerPhone,
       customerUrl: order.customerUrl,
+      isUrgent: order.isUrgent,
       totalPrice: order.products.reduce(
         (acc, item) => acc + item.price * item.quantity,
         0

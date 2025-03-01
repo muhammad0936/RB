@@ -37,6 +37,10 @@ const tempOrderSchema = new Schema(
       ref: 'Admin',
       required: true,
     },
+    isUrgent: {
+      type: Boolean,
+      default: false,
+    },
     customerUrl: String,
   },
   {
