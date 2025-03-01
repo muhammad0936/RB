@@ -28,6 +28,10 @@ const customerSchema = new Schema(
           ref: 'Product',
           required: true,
         },
+        price: {
+          type: Number,
+          required: true,
+        },
         size: {
           type: Number,
           required: true,

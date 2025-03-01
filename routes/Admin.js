@@ -52,8 +52,6 @@ const {
   updateOffer,
   deleteOffer,
   manageProducts,
-  getOffers,
-  getOneOffer,
 } = require('../controllers/Admin/Offer');
 
 // router.post(
@@ -165,7 +163,4 @@ router.delete('/offer/:id', multerGlobal, isAuth, deleteOffer);
 
 router.put('/manageOfferProducts/:id', multerGlobal, isAuth, manageProducts);
 
-router.get('/offers', multerGlobal, isAuth, getOffers);
-
-router.get('/offer/:id', multerGlobal, isAuth, getOneOffer);
 module.exports = router;

@@ -41,7 +41,10 @@ exports.addToCart = async (req, res, next) => {
     }
 
     // Fetch the customer
-    const customer = await Customer.findById(customerId);
+    const customer = await Customer.findById(customerId).populate({
+      path: 'cart.product',
+      select: 'price',
+    });
     if (!customer) {
       const error = new Error('Customer not found.');
       error.statusCode = StatusCodes.NOT_FOUND;
@@ -53,6 +56,7 @@ exports.addToCart = async (req, res, next) => {
       (item) =>
         item.product?.toString() === productId &&
         +item.size === +size &&
+        +item.price === +product.price &&
         item.notes === notes
     );
 
@@ -63,6 +67,7 @@ exports.addToCart = async (req, res, next) => {
       // Add the product to the cart
       customer.cart.push({
         product: productId,
+        price: product.price,
         size,
         quantity,
         notes,
@@ -173,7 +178,6 @@ exports.changeCartItemQuantity = async (req, res, next) => {
     const customerId = req.userId;
 
     // Validate quantityChange
-    console.log(req.body);
     if (typeof quantityChange !== 'number' || quantityChange === 0) {
       const error = new Error(
         'Invalid quantityChange value. It must be a non-zero number.'
@@ -201,7 +205,14 @@ exports.changeCartItemQuantity = async (req, res, next) => {
       error.statusCode = StatusCodes.NOT_FOUND;
       throw error;
     }
-
+    const product = await Product.findById(cartItem.product);
+    if (quantityChange > 0 && cartItem.price !== product.price) {
+      const error = new Error(
+        'Cant increment the quantity, the price of this product has changed, add it to the cart again'
+      );
+      error.statusCode = 400;
+      throw error;
+    }
     // Calculate the new quantity
     const newQuantity = cartItem.quantity + quantityChange;
 
@@ -263,7 +274,7 @@ exports.getCart = async (req, res, next) => {
     const customer = await Customer.findById(customerId)
       .populate({
         path: 'cart.product',
-        select: 'title price images productType',
+        select: 'title images productType',
         populate: {
           path: 'productType',
           select: 'name parentProductType',
@@ -283,7 +294,7 @@ exports.getCart = async (req, res, next) => {
 
     // Calculate the total price of the cart
     const totalPrice = customer.cart.reduce((total, item) => {
-      total + item.product?.price * item.quantity;
+      total + item.price * item.quantity;
     }, 0);
 
     // Send success response

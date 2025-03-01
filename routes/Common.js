@@ -16,6 +16,8 @@ const {
   getCitiesByGovernorate,
   getOrderStatuses,
 } = require('../controllers/Common/Location');
+const { getOffers, getOneOffer } = require('../controllers/Common/Offer');
+const multerGlobal = require('../middlewares/multerGlobal');
 
 router.get('/parentProductTypes', getParentProductTypes);
 
@@ -36,5 +38,9 @@ router.get('/governorates/:stateId', getGovernoratesByState);
 router.get('/cities/:governorateId', getCitiesByGovernorate);
 
 router.get('/orderStatuses', getOrderStatuses);
+
+router.get('/offers', multerGlobal, getOffers);
+
+router.get('/offer/:id', multerGlobal, getOneOffer);
 
 module.exports = router;

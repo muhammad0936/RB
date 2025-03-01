@@ -20,6 +20,7 @@ const {
   requestPasswordReset,
   resetPassword,
 } = require('../controllers/Customer/ResetPassword');
+const { addOfferToCart } = require('../controllers/Customer/Offer');
 
 router.post('/signup', multerGlobal, signup);
 
@@ -49,5 +50,7 @@ router.post('/order', multerGlobal, isAuth, createOrder);
 router.get('/orders', isAuth, multerGlobal, getOrders);
 
 router.get('/orders/:orderId', isAuth, multerGlobal, getOneOrder);
+
+router.post('/offerCart', multerGlobal, isAuth, addOfferToCart);
 
 module.exports = router;
