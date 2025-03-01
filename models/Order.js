@@ -81,6 +81,7 @@ const orderSchema = new Schema(
         apartment: String,
       },
       notes: String,
+      adminNotes: String,
     },
     coupon: {
       code: String,

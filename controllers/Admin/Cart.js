@@ -1,13 +1,15 @@
 const { StatusCodes } = require('http-status-codes');
 const mongoose = require('mongoose');
 
-const Customer = require('../../models/Customer');
+const Admin = require('../../models/Admin');
 const Product = require('../../models/Product');
+const { ensureIsAdmin } = require('../../util/ensureIsAdmin');
 
 exports.addToCart = async (req, res, next) => {
   try {
     const { productId, size, quantity, notes = '' } = req.body;
-    const customerId = req.userId;
+    const adminId = req.userId;
+    await ensureIsAdmin(adminId);
 
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       const error = new Error('Invalid product ID.');
@@ -40,16 +42,16 @@ exports.addToCart = async (req, res, next) => {
       throw error;
     }
 
-    // Fetch the customer
-    const customer = await Customer.findById(customerId);
-    if (!customer) {
-      const error = new Error('Customer not found.');
+    // Fetch the admin
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      const error = new Error('Admin not found.');
       error.statusCode = StatusCodes.NOT_FOUND;
       throw error;
     }
 
     // Check if the product is already in the cart
-    const existingCartItem = customer.cart.find(
+    const existingCartItem = admin.cart.find(
       (item) =>
         item.product?.toString() === productId &&
         +item.size === +size &&
@@ -62,7 +64,7 @@ exports.addToCart = async (req, res, next) => {
       existingCartItem.quantity += +quantity;
     } else {
       // Add the product to the cart
-      customer.cart.push({
+      admin.cart.push({
         product: productId,
         price: product.price,
         size,
@@ -71,14 +73,14 @@ exports.addToCart = async (req, res, next) => {
       });
     }
 
-    // Save the updated customer document
-    await customer.save();
+    // Save the updated admin document
+    await admin.save();
 
     // Send success response
     res.status(StatusCodes.OK).json({
       success: true,
       message: 'Product added to cart successfully.',
-      cart: customer.cart,
+      cart: admin.cart,
     });
   } catch (error) {
     // Error handling
@@ -88,7 +90,7 @@ exports.addToCart = async (req, res, next) => {
 
     console.error(`Add to Cart Error: ${error.message}`, {
       productId: req.body.productId,
-      customerId: req.userId,
+      adminId: req.userId,
       timestamp: new Date().toISOString(),
     });
 
@@ -109,18 +111,19 @@ exports.addToCart = async (req, res, next) => {
 exports.removeFromCart = async (req, res, next) => {
   try {
     const { itemId } = req.body;
-    const customerId = req.userId;
+    const adminId = req.userId;
+    await ensureIsAdmin(adminId);
 
-    // Fetch the customer
-    const customer = await Customer.findById(customerId);
-    if (!customer) {
-      const error = new Error('Customer not found.');
+    // Fetch the admin
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      const error = new Error('Admin not found.');
       error.statusCode = StatusCodes.NOT_FOUND;
       throw error;
     }
 
     // Find the index of the item in the cart
-    const itemIndex = customer.cart.findIndex(
+    const itemIndex = admin.cart.findIndex(
       (item) => item._id.toString() === itemId
     );
 
@@ -132,16 +135,16 @@ exports.removeFromCart = async (req, res, next) => {
     }
 
     // Remove the item from the cart
-    customer.cart.splice(itemIndex, 1);
+    admin.cart.splice(itemIndex, 1);
 
-    // Save the updated customer document
-    await customer.save();
+    // Save the updated admin document
+    await admin.save();
 
     // Send success response
     res.status(StatusCodes.OK).json({
       success: true,
       message: 'Item removed from cart successfully.',
-      cart: customer.cart,
+      cart: admin.cart,
     });
   } catch (error) {
     // Error handling
@@ -151,7 +154,7 @@ exports.removeFromCart = async (req, res, next) => {
 
     console.error(`Remove from Cart Error: ${error.message}`, {
       // productId: removedProductId,
-      customerId: req.userId,
+      adminId: req.userId,
       timestamp: new Date().toISOString(),
     });
 
@@ -172,7 +175,8 @@ exports.removeFromCart = async (req, res, next) => {
 exports.changeCartItemQuantity = async (req, res, next) => {
   try {
     const { itemId, quantityChange } = req.body;
-    const customerId = req.userId;
+    const adminId = req.userId;
+    await ensureIsAdmin(adminId);
 
     // Validate quantityChange
     if (typeof quantityChange !== 'number' || quantityChange === 0) {
@@ -183,18 +187,16 @@ exports.changeCartItemQuantity = async (req, res, next) => {
       throw error;
     }
 
-    // Fetch the customer
-    const customer = await Customer.findById(customerId);
-    if (!customer) {
-      const error = new Error('Customer not found.');
+    // Fetch the admin
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      const error = new Error('Admin not found.');
       error.statusCode = StatusCodes.NOT_FOUND;
       throw error;
     }
 
     // Find the item in the cart
-    const cartItem = customer.cart.find(
-      (item) => item._id.toString() === itemId
-    );
+    const cartItem = admin.cart.find((item) => item._id.toString() === itemId);
 
     // Check if the item exists in the cart
     if (!cartItem) {
@@ -216,16 +218,14 @@ exports.changeCartItemQuantity = async (req, res, next) => {
     // Validate the new quantity
     if (newQuantity < 1) {
       // Remove the item if the new quantity is less than 1
-      customer.cart = customer.cart.filter(
-        (item) => item._id.toString() !== itemId
-      );
+      admin.cart = admin.cart.filter((item) => item._id.toString() !== itemId);
     } else {
       // Update the quantity
       cartItem.quantity = newQuantity;
     }
 
-    // Save the updated customer document
-    await customer.save();
+    // Save the updated admin document
+    await admin.save();
 
     // Send success response
     res.status(StatusCodes.OK).json({
@@ -234,7 +234,7 @@ exports.changeCartItemQuantity = async (req, res, next) => {
         newQuantity >= 1
           ? 'Item quantity updated successfully.'
           : 'Item removed from cart successfully.',
-      cart: customer.cart,
+      cart: admin.cart,
     });
   } catch (error) {
     // Error handling
@@ -245,7 +245,7 @@ exports.changeCartItemQuantity = async (req, res, next) => {
     console.error(`Change Cart Item Quantity Error: ${error.message}`, {
       itemId: req.body.itemId,
       quantityChange: req.body.quantityChange,
-      customerId: req.userId,
+      adminId: req.userId,
       timestamp: new Date().toISOString(),
     });
 
@@ -265,10 +265,10 @@ exports.changeCartItemQuantity = async (req, res, next) => {
 
 exports.getCart = async (req, res, next) => {
   try {
-    const customerId = req.userId; // Assuming the customer ID is stored in req.userId after authentication
-
-    // Fetch the customer and populate the cart items with product details
-    const customer = await Customer.findById(customerId)
+    const adminId = req.userId; // Assuming the admin ID is stored in req.userId after authentication
+    await ensureIsAdmin(adminId);
+    // Fetch the admin and populate the cart items with product details
+    const admin = await Admin.findById(adminId)
       .populate({
         path: 'cart.product',
         select: 'title images productType',
@@ -283,14 +283,14 @@ exports.getCart = async (req, res, next) => {
       })
       .lean();
 
-    if (!customer) {
-      const error = new Error('Customer not found.');
+    if (!admin) {
+      const error = new Error('Admin not found.');
       error.statusCode = StatusCodes.NOT_FOUND;
       throw error;
     }
 
     // Calculate the total price of the cart
-    const totalPrice = customer.cart.reduce((total, item) => {
+    const totalPrice = admin.cart.reduce((total, item) => {
       return total + item.price * item.quantity;
     }, 0);
 
@@ -298,7 +298,7 @@ exports.getCart = async (req, res, next) => {
     res.status(StatusCodes.OK).json({
       success: true,
       data: {
-        cart: customer.cart,
+        cart: admin.cart,
         totalPrice,
       },
     });
@@ -309,7 +309,7 @@ exports.getCart = async (req, res, next) => {
     }
 
     console.error(`Get Cart Error: ${error.message}`, {
-      customerId: req.userId,
+      adminId: req.userId,
       timestamp: new Date().toISOString(),
     });
 

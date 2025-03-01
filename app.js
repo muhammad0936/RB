@@ -19,6 +19,7 @@ const CustomerRoutes = require('./routes/Customer');
 const CommonRoutes = require('./routes/Common');
 const PaymentRoutes = require('./routes/Payment');
 const CloudinaryRoutes = require('./routes/CloudinaryUploads');
+const AdminCart = require('./routes/AdminCart');
 
 const connectToDatabase = require('./database/connection');
 
@@ -55,6 +56,7 @@ app.use((req, res, next) => {
 
 app.use('/admin', AdminRoutes);
 app.use('/admin', CloudinaryRoutes);
+app.use('/admin', AdminCart);
 app.use('/operator', OperatorRoutes);
 app.use('/customer', CustomerRoutes);
 app.use(CommonRoutes);

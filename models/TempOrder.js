@@ -1,27 +1,15 @@
+// models/Order.js
 const mongoose = require('mongoose');
+const mongoosePaginate = require('mongoose-paginate-v2');
 
 const Schema = mongoose.Schema;
-
-const adminSchema = new Schema(
+const tempOrderSchema = new Schema(
   {
-    name: {
+    customerPhone: {
       type: String,
       required: true,
     },
-    email: {
-      type: String,
-      unique: true,
-    },
-    password: {
-      type: String,
-      required: true,
-    },
-    phone: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    cart: [
+    products: [
       {
         product: {
           type: Schema.Types.ObjectId,
@@ -43,10 +31,19 @@ const adminSchema = new Schema(
         notes: String,
       },
     ],
-    resetToken: String,
-    resetTokenExpiration: Date,
+    adminNotes: String,
+    creator: {
+      type: Schema.Types.ObjectId,
+      ref: 'Admin',
+      required: true,
+    },
+    customerUrl: String,
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    versionKey: false,
+  }
 );
 
-module.exports = mongoose.model('Admin', adminSchema);
+tempOrderSchema.plugin(mongoosePaginate);
+module.exports = mongoose.model('TempOrder', tempOrderSchema);
