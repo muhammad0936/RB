@@ -131,7 +131,6 @@ exports.manageProducts = async (req, res) => {
         });
     }
 
-    console.log(offer);
     await offer.save();
 
     res.json({
@@ -196,7 +195,6 @@ const _addProducts = async (offer, products) => {
 };
 
 const _removeProducts = async (offer, productIds) => {
-  console.log(productIds);
   offer.products = offer.products.filter(
     (p) => !productIds.includes(p.product.toString())
   );

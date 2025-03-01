@@ -4,10 +4,6 @@ const Order = require('../../models/Order');
 const { OrderStatus } = require('../../util/types');
 const { ensureIsAdmin } = require('../../util/ensureIsAdmin');
 
-exports.getOrderStatuses = async (req, res) => {
-  res.status(200).json(OrderStatus);
-};
-
 // Get all orders (admin)
 exports.getOrders = async (req, res) => {
   try {

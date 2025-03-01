@@ -64,7 +64,3 @@ exports.getCitiesByGovernorate = async (req, res, next) => {
     next(error);
   }
 };
-
-exports.getOrderStatuses = async (req, res) => {
-  res.status(200).json(OrderStatus);
-};

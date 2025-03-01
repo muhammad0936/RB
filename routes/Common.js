@@ -14,10 +14,10 @@ const {
   getStateByName,
   getGovernoratesByState,
   getCitiesByGovernorate,
-  getOrderStatuses,
 } = require('../controllers/Common/Location');
 const { getOffers, getOneOffer } = require('../controllers/Common/Offer');
 const multerGlobal = require('../middlewares/multerGlobal');
+const { getOrderStatuses } = require('../controllers/Common/Order');
 
 router.get('/parentProductTypes', getParentProductTypes);
 

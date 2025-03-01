@@ -104,7 +104,6 @@ exports.addOfferToCart = async (req, res) => {
       const offerProduct = offer.products.find(
         (op) => op.product._id.toString() === item.productId
       );
-      console.log(item.productId, item.size, offerProduct.newPrice, item.notes);
       const existingItem = customer.cart.find(
         (cartItem) =>
           cartItem.product.toString() === item.productId &&

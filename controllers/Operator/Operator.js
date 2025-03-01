@@ -238,21 +238,19 @@ exports.getOneOrder = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
   const { orderId } = req.params;
   const { status } = req.body;
-
+  const validStatuses = Object.values(OrderStatus).filter(
+    (s) => s !== 'Pending'
+  );
   // Validate the order ID
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
     return res.status(400).json({ message: 'Invalid order ID' });
   }
 
   // Validate the new status
-  if (!Object.values(OrderStatus).includes(status)) {
-    return res.status(400).json({ message: 'Invalid status value' });
-  }
-  // Validate the new status
-  if (!Object.values(OrderStatus).includes(status)) {
+  if (!Object.values(validStatuses).includes(status)) {
     return res.status(400).json({
       message: 'Invalid status value',
-      validStatuses: Object.values(OrderStatus), // Provide valid statuses for reference
+      validStatuses: Object.values(validStatuses), // Provide valid statuses for reference
     });
   }
 
