@@ -512,7 +512,7 @@ exports.getOneOrder = async (req, res) => {
         quantity: item.quantity,
         price: item.price,
         size: item.size,
-        notes: item.notes,
+        notes: order.adminNotes ? '' : item.notes,
       })),
     };
 
