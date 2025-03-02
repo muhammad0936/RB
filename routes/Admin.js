@@ -35,6 +35,7 @@ const {
   addOperator,
   deleteOperator,
   getOperators,
+  editOperator,
 } = require('../controllers/Admin/Operator');
 const {
   requestPasswordReset,
@@ -135,6 +136,8 @@ router.get('/orders/:orderId', isAuth, multerGlobal, getOneOrder);
 router.get('/customers', multerGlobal, isAuth, getCustomers);
 
 router.post('/operator', multerGlobal, isAuth, addOperator);
+
+router.put('/operator/:id', multerGlobal, isAuth, editOperator);
 
 router.delete('/operator/:id', isAuth, deleteOperator);
 

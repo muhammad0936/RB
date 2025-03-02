@@ -41,6 +41,59 @@ exports.addOperator = async (req, res) => {
   }
 };
 
+exports.editOperator = async (req, res) => {
+  try {
+    const admin = await ensureIsAdmin(req.userId);
+    const { id } = req.params;
+    const { name, email, password, phone } = req.body;
+
+    // Find operator to update
+    const operator = await Operator.findById(id);
+    if (!operator) {
+      return res.status(404).json({ message: 'Operator not found' });
+    }
+
+    // Check for duplicate email/phone (excluding current operator)
+    if (email || phone) {
+      const existingOperator = await Operator.findOne({
+        $or: [{ email }, { phone }],
+        _id: { $ne: id }, // Exclude current operator from check
+      });
+
+      if (existingOperator) {
+        return res.status(400).json({
+          message: 'Operator with the same email or phone already exists',
+        });
+      }
+    }
+
+    // Update fields
+    if (name) operator.name = name;
+    if (email) operator.email = email;
+    if (phone) operator.phone = phone;
+    if (password) {
+      operator.password = await bcrypt.hash(password, 12);
+    }
+
+    await operator.save();
+
+    res.status(200).json({
+      message: 'Operator updated successfully',
+      operator: {
+        id: operator._id,
+        name: operator.name,
+        email: operator.email,
+        phone: operator.phone,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error updating operator',
+      error: error.message,
+    });
+  }
+};
+
 exports.deleteOperator = async (req, res) => {
   try {
     const admin = await ensureIsAdmin(req.userId);
@@ -75,6 +128,7 @@ exports.getOperators = async (req, res) => {
     const total = await Operator.countDocuments(filters);
 
     const operators = await Operator.find(filters)
+      .select('-password -__v')
       .skip(skip)
       .limit(parseInt(limit))
       .sort({ createdAt: -1 });
