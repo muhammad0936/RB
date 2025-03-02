@@ -91,3 +91,11 @@ connectToDatabase(process.env.MONGO_STRING)
   });
 
 module.exports = app;
+
+// const x = {
+//   a: 'a',
+//   b: 'b',
+//   c: 'c',
+// };
+// const y = { ...x, c: undefined };
+// console.log(y);

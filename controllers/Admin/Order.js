@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const { StatusCodes } = require('http-status-codes');
 const Order = require('../../models/Order');
+const Product = require('../../models/Product');
 const { OrderStatus } = require('../../util/types');
+const Customer = require('../../models/Customer');
 const { ensureIsAdmin } = require('../../util/ensureIsAdmin');
 
 // Get all orders (admin)
@@ -9,70 +11,109 @@ exports.getOrders = async (req, res) => {
   try {
     const admin = await ensureIsAdmin(req.userId);
     const {
-      page = 1,
-      limit = 10,
-      status,
-      customer,
+      name,
+      phone,
+      orderId,
+      productTitle,
       startDate,
       endDate,
-      minAmount,
-      maxAmount,
-      isUrgent,
-      isPaid,
+      page = 1,
+      limit = 10,
     } = req.query;
 
-    // Build filter object
     const filter = {};
 
-    // Customer filter
-    if (customer) {
-      filter.customer = customer;
+    // Customer Name Filter
+    if (name) {
+      const customers = await Customer.find({
+        name: { $regex: name, $options: 'i' },
+      }).select('_id');
+      const customerIds = customers.map((c) => c._id);
+      filter.customer = customerIds.length ? { $in: customerIds } : null;
     }
 
-    // Status filter
-    if (status) {
-      filter.status = { $regex: new RegExp(status, 'i') };
+    // Customer Phone Filter
+    if (phone) {
+      const customer = await Customer.findOne({ phone }).select('_id');
+      filter.customer = customer?._id;
     }
 
-    // Date range filter
+    // Order ID Filter
+    if (orderId) {
+      if (mongoose.isValidObjectId(orderId)) {
+        filter._id = new mongoose.Types.ObjectId(orderId);
+      } else {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: 'Invalid order ID format',
+        });
+      }
+    }
+
+    // Product Title Filter
+    if (productTitle) {
+      const products = await Product.find({
+        title: { $regex: productTitle, $options: 'i' },
+      }).select('_id');
+      const productIds = products.map((p) => p._id);
+      if (productIds.length) {
+        filter['products.product'] = { $in: productIds };
+      }
+    }
+
+    // Date Range Filter
     if (startDate || endDate) {
       filter.createdAt = {};
       if (startDate) {
         const start = new Date(startDate);
-        if (!isNaN(start)) filter.createdAt.$gte = start;
+        start.setHours(0, 0, 0, 0);
+        filter.createdAt.$gte = start;
       }
       if (endDate) {
         const end = new Date(endDate);
-        if (!isNaN(end)) filter.createdAt.$lte = end;
+        end.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = end;
       }
     }
 
-    // Amount range filter
-    if (minAmount || maxAmount) {
-      filter.totalAmount = {};
-      if (minAmount) filter.totalAmount.$gte = Number(minAmount);
-      if (maxAmount) filter.totalAmount.$lte = Number(maxAmount);
-    }
-
-    // Boolean filters
-    if (isUrgent) filter.isUrgent = isUrgent === 'true';
-    if (isPaid) filter.isPaid = isPaid === 'true';
+    // Pagination Options
     const options = {
       select: 'createdAt status totalAmount isUrgent',
       page: parseInt(page),
       limit: parseInt(limit),
       sort: { createdAt: -1 },
       populate: [
-        { path: 'customer', select: 'name' },
+        {
+          path: 'customer',
+          select: 'name phone',
+          match: name || phone ? {} : undefined, // Maintain population even if filtered
+        },
         { path: 'deliveryAddress.state', select: 'name' },
+        {
+          path: 'products.product',
+          select: 'title',
+          match: productTitle ? {} : undefined,
+        },
       ],
       lean: true,
     };
+
+    // Execute paginated query
     const orders = await Order.paginate(filter, options);
 
+    // Filter empty results from population
+    const filteredDocs = orders.docs.filter(
+      (doc) =>
+        (!name || doc.customer) &&
+        (!productTitle || doc.products.some((p) => p.product))
+    );
+    const returnedDoce = filteredDocs.map((d) => {
+      delete d.products;
+      return d;
+    });
     res.status(StatusCodes.OK).json({
       success: true,
-      orders: orders.docs,
+      orders: returnedDoce,
       pagination: {
         totalOrders: orders.totalDocs,
         currentPage: orders.page,
@@ -85,10 +126,10 @@ exports.getOrders = async (req, res) => {
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: 'Failed to retrieve orders',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
-
 // Get single order details (admin)
 exports.getOneOrder = async (req, res) => {
   try {
