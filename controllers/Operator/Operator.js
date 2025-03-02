@@ -191,6 +191,8 @@ exports.getOneOrder = async (req, res) => {
         email: order.customer?.email,
         phone: order.customer?.phone,
       },
+      orderNotes: order.notes,
+      adminNotes: order.adminNotes,
       status: order.status,
       orderDate: order.createdAt,
       FinalCost: order.totalAmount,
@@ -205,7 +207,6 @@ exports.getOneOrder = async (req, res) => {
           }
         : null,
       isUrgent: order.isUrgent,
-      orderNotes: order.notes,
       deliveryAddress: {
         area: `${order.deliveryAddress.city?.name}, ${order.deliveryAddress.governorate?.name}`,
         street: order.deliveryAddress.street,

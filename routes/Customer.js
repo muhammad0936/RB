@@ -21,6 +21,9 @@ const {
   resetPassword,
 } = require('../controllers/Customer/ResetPassword');
 const { addOfferToCart } = require('../controllers/Customer/Offer');
+const {
+  createOrderFromTempOrder,
+} = require('../controllers/Customer/TempOrder');
 
 router.post('/signup', multerGlobal, signup);
 
@@ -46,6 +49,13 @@ router.get('/cart', isAuth, getCart);
 router.get('/checkout', multerGlobal, isAuth, checkout);
 
 router.post('/order', multerGlobal, isAuth, createOrder);
+
+router.post(
+  '/orderFromTempOrder',
+  multerGlobal,
+  isAuth,
+  createOrderFromTempOrder
+);
 
 router.get('/orders', isAuth, multerGlobal, getOrders);
 

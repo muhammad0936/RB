@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { StatusCodes } = require('http-status-codes');
 const Order = require('../../models/Order');
 const TempOrder = require('../../models/TempOrder');
+const Product = require('../../models/Product');
 
 const axios = require('axios');
 const Customer = require('../../models/Customer');
@@ -9,13 +10,11 @@ const State = require('../../models/State');
 const Governorate = require('../../models/Governorate');
 const City = require('../../models/City');
 const Coupon = require('../../models/Coupon');
-const { OrderStatus } = require('../../util/types');
 
 exports.createOrderFromTempOrder = async (req, res) => {
   let newOrder = null;
   try {
-    const { tempOrderId } = req.params;
-    const { deliveryAddress, notes, couponCode, isUrgent, paymentMethodId } =
+    const { tempOrderId, deliveryAddress, notes, couponCode, paymentMethodId } =
       req.body;
 
     // Validate temp order ID
@@ -36,12 +35,17 @@ exports.createOrderFromTempOrder = async (req, res) => {
     }
 
     // Get customer by phone from temp order
-    const customer = await Customer.findOne({ phone: tempOrder.customerPhone });
+    const customer = await Customer.findById(req.userId);
     if (!customer) {
       return res.status(StatusCodes.NOT_FOUND).json({
         success: false,
         message: 'Customer not found',
       });
+    }
+    if (customer.phone != tempOrder.customerPhone) {
+      const error = new Error('This order is not for this customer!');
+      error.statusCode = 400;
+      throw error;
     }
 
     // Validate delivery address
@@ -83,7 +87,7 @@ exports.createOrderFromTempOrder = async (req, res) => {
         const product = await Product.findById(item.product).select('weight');
         return {
           ...item.toObject(),
-          product: { weight: product?.weight || 0 },
+          product: { weight: product?.weight || 1 },
         };
       })
     );
@@ -131,13 +135,14 @@ exports.createOrderFromTempOrder = async (req, res) => {
 
     // Create the order
     newOrder = await Order.create({
-      products: tempOrder.products.map((item) => ({
-        product: item.product,
-        price: item.price,
-        size: item.size,
-        quantity: item.quantity,
-        notes: item.notes,
-      })),
+      // products: tempOrder.products.map((item) => ({
+      //   product: item.product,
+      //   price: item.price,
+      //   size: item.size,
+      //   quantity: item.quantity,
+      //   notes: item.notes,
+      // })),
+      products: tempOrder.products,
       customer: customer._id,
       totalAmount,
       deliveryCost,
@@ -150,9 +155,9 @@ exports.createOrderFromTempOrder = async (req, res) => {
             couponRef: coupon._id,
           }
         : undefined,
-      isUrgent,
-      notes: notes || tempOrder.adminNotes,
-      status: OrderStatus.pending,
+      isUrgent: tempOrder.isUrgent,
+      notes: notes,
+      adminNotes: tempOrder.adminNotes,
     });
 
     // Prepare payment payload
@@ -194,7 +199,6 @@ exports.createOrderFromTempOrder = async (req, res) => {
       {
         invoiceId: paymentResponse.data.Data.InvoiceId,
         paymentUrl: paymentResponse.data.Data.PaymentURL,
-        status: OrderStatus.pending,
       },
       { new: true }
     );

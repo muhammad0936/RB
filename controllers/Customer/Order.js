@@ -13,7 +13,7 @@ const { OrderStatus } = require('../../util/types');
 exports.checkout = async (req, res) => {
   try {
     const customerId = req.userId;
-    const { deliveryAddress, couponCode, isUrgent } = req.body;
+    const { deliveryAddress, couponCode } = req.body;
 
     // Validate required fields
     if (
@@ -177,8 +177,7 @@ exports.createOrder = async (req, res) => {
   let tempOrder = null;
   try {
     const customerId = req.userId;
-    const { deliveryAddress, notes, couponCode, isUrgent, paymentMethodId } =
-      req.body;
+    const { deliveryAddress, notes, couponCode, paymentMethodId } = req.body;
     // Validation
     if (
       !deliveryAddress?.state ||
@@ -289,9 +288,7 @@ exports.createOrder = async (req, res) => {
             couponRef: coupon._id,
           }
         : undefined,
-      isUrgent,
       notes,
-      status: OrderStatus.pending,
     });
     // Prepare payment payload
     const paymentPayload = {
@@ -337,7 +334,6 @@ exports.createOrder = async (req, res) => {
       {
         invoiceId: paymentResponse.data.Data.InvoiceId,
         paymentUrl: paymentResponse.data.Data.PaymentURL,
-        status: OrderStatus.pending,
       },
       { new: true }
     );
@@ -393,7 +389,6 @@ exports.getOrders = async (req, res) => {
       endDate,
       minAmount,
       maxAmount,
-      isUrgent,
       isPaid,
     } = req.query;
 
@@ -426,7 +421,6 @@ exports.getOrders = async (req, res) => {
     }
 
     // Boolean filters
-    if (isUrgent) filter.isUrgent = isUrgent === 'true';
     if (isPaid) filter.isPaid = isPaid === 'true';
     const options = {
       select: '_id totalAmount createdAt estimatedDelivery status',
@@ -495,7 +489,6 @@ exports.getOneOrder = async (req, res) => {
       orderId: order._id,
       status: order.status,
       isPaid: order.isPaid,
-      isUrgent: order.isUrgent,
       orderDate: order.createdAt,
       finalCost: order.totalAmount,
       deliveryCost: order.deliveryCost,

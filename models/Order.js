@@ -81,7 +81,6 @@ const orderSchema = new Schema(
         apartment: String,
       },
       notes: String,
-      adminNotes: String,
     },
     coupon: {
       code: String,
@@ -118,6 +117,7 @@ const orderSchema = new Schema(
     trackingNumber: String,
     estimatedDelivery: Date,
     notes: String,
+    adminNotes: String,
   },
   {
     timestamps: true,
