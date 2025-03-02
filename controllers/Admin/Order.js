@@ -22,20 +22,29 @@ exports.getOrders = async (req, res) => {
     } = req.query;
 
     const filter = {};
+    // Customer Name and Phone Filter (combined)
+    if (name || phone) {
+      const customerFilter = {};
 
-    // Customer Name Filter
-    if (name) {
-      const customers = await Customer.find({
-        name: { $regex: name, $options: 'i' },
-      }).select('_id');
+      if (name) {
+        customerFilter.name = { $regex: name, $options: 'i' };
+      }
+
+      if (phone) {
+        customerFilter.phone = phone;
+      }
+
+      // Find customers that match BOTH name and phone (if both are provided)
+      const customers = await Customer.find(customerFilter).select('_id');
       const customerIds = customers.map((c) => c._id);
-      filter.customer = customerIds.length ? { $in: customerIds } : null;
-    }
 
-    // Customer Phone Filter
-    if (phone) {
-      const customer = await Customer.findOne({ phone }).select('_id');
-      filter.customer = customer?._id;
+      // Set filter for Orders
+      if (customerIds.length > 0) {
+        filter.customer = { $in: customerIds };
+      } else {
+        // No matching customers = return no orders
+        filter.customer = { $in: [] };
+      }
     }
 
     // Order ID Filter
