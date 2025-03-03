@@ -52,8 +52,8 @@ exports.createTempOrder = async (req, res) => {
         }
 
         if (
-          item.selectedAttributes?.[attr.name] &&
-          !attr.options.includes(item.selectedAttributes[attr.name])
+          attributesObject?.[attr.name] &&
+          !attr.options.includes(attributesObject[attr.name])
         ) {
           throw new Error(`Invalid option for ${attr.name}`);
         }
