@@ -209,6 +209,12 @@ exports.getOneOrder = async (req, res) => {
         quantity: item.quantity,
         price: item.price,
         size: item.size,
+        selectedAttributes: item.selectedAttributes
+          ? Object.entries(item.selectedAttributes).map(([key, value]) => ({
+              name: key,
+              value: value,
+            }))
+          : [],
         notes: item.notes,
       })),
     };

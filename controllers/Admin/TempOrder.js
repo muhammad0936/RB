@@ -4,6 +4,7 @@ const Customer = require('../../models/Customer');
 const { ensureIsAdmin } = require('../../util/ensureIsAdmin');
 const Admin = require('../../models/Admin');
 const TempOrder = require('../../models/TempOrder');
+const Product = require('../../models/Product');
 
 exports.createTempOrder = async (req, res) => {
   try {
@@ -18,6 +19,7 @@ exports.createTempOrder = async (req, res) => {
       error.statusCode = 400;
       throw error;
     }
+
     const admin = await Admin.findById(adminId).populate({
       path: 'cart.product',
       select: 'title images productType',
@@ -37,6 +39,27 @@ exports.createTempOrder = async (req, res) => {
       });
     }
 
+    // Validate attributes for all cart items
+    for (const item of admin.cart) {
+      const product = await Product.findById(item.product);
+
+      product.attributes.forEach((attr) => {
+        const attributesObject = Object.fromEntries(item.selectedAttributes);
+        if (attr.required && !attributesObject?.[attr.name]) {
+          throw new Error(
+            `Missing required attribute: ${attr.name}, productId: ${product._id}`
+          );
+        }
+
+        if (
+          item.selectedAttributes?.[attr.name] &&
+          !attr.options.includes(item.selectedAttributes[attr.name])
+        ) {
+          throw new Error(`Invalid option for ${attr.name}`);
+        }
+      });
+    }
+
     // Calculate totals
     let totalProductPrice = 0;
     const cartItems = admin.cart.map((item) => {
@@ -47,6 +70,7 @@ exports.createTempOrder = async (req, res) => {
         size: item?.size,
         quantity: item?.quantity,
         notes: item?.notes || '',
+        selectedAttributes: item.selectedAttributes,
       };
     });
     const tempOrder = new TempOrder({

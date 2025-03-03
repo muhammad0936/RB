@@ -229,6 +229,7 @@ exports.createOrder = async (req, res) => {
       const product = await Product.findById(item.product);
 
       product.attributes.forEach((attr) => {
+        console.log(item.selectedAttributes);
         if (attr.required && !item.selectedAttributes?.[attr.name]) {
           throw new Error(`Missing required attribute: ${attr.name}`);
         }
