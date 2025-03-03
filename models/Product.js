@@ -56,6 +56,22 @@ const productSchema = new Schema(
       ref: 'Admin',
       required: true,
     },
+    attributes: [
+      {
+        name: {
+          type: String,
+          required: true,
+        },
+        options: {
+          type: [String],
+          required: true,
+        },
+        required: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );

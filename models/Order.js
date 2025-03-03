@@ -14,6 +14,10 @@ const orderSchema = new Schema(
           ref: 'Product',
           required: true,
         },
+        selectedAttributes: {
+          type: Map,
+          of: Schema.Types.Mixed,
+        },
         price: {
           type: Number,
           required: true,

@@ -9,6 +9,7 @@ const Governorate = require('../../models/Governorate');
 const City = require('../../models/City');
 const Coupon = require('../../models/Coupon');
 const { OrderStatus } = require('../../util/types');
+const Product = require('../../models/Product');
 
 exports.checkout = async (req, res) => {
   try {
@@ -223,6 +224,24 @@ exports.createOrder = async (req, res) => {
       });
     }
 
+    // Validate attributes for all cart items
+    for (const item of customer.cart) {
+      const product = await Product.findById(item.product);
+
+      product.attributes.forEach((attr) => {
+        if (attr.required && !item.selectedAttributes?.[attr.name]) {
+          throw new Error(`Missing required attribute: ${attr.name}`);
+        }
+
+        if (
+          item.selectedAttributes?.[attr.name] &&
+          !attr.options.includes(item.selectedAttributes[attr.name])
+        ) {
+          throw new Error(`Invalid option for ${attr.name}`);
+        }
+      });
+    }
+
     // Calculate totals
     let totalProductPrice = 0;
     let totalWeight = 0;
@@ -235,9 +254,9 @@ exports.createOrder = async (req, res) => {
         size: item?.size,
         quantity: item?.quantity,
         notes: item?.notes || '',
+        selectedAttributes: item.selectedAttributes,
       };
     });
-
     // Calculate delivery cost
     const deliveryCost =
       parseFloat(state.firstKiloDeliveryCost) +
@@ -461,7 +480,6 @@ exports.getOneOrder = async (req, res) => {
         message: 'Invalid order ID',
       });
     }
-
     const order = await Order.findOne({
       _id: orderId,
       customer: customerId,
@@ -508,10 +526,17 @@ exports.getOneOrder = async (req, res) => {
         notes: order.deliveryAddress.notes || '',
       },
       products: order.products.map((item) => ({
+        _id: item.product?._id,
         title: item.product?.title,
         quantity: item.quantity,
         price: item.price,
         size: item.size,
+        selectedAttributes: item.selectedAttributes
+          ? Object.entries(item.selectedAttributes).map(([key, value]) => ({
+              name: key,
+              value: value,
+            }))
+          : [],
         notes: order.adminNotes ? '' : item.notes,
       })),
     };

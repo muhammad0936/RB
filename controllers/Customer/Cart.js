@@ -6,7 +6,13 @@ const Product = require('../../models/Product');
 
 exports.addToCart = async (req, res, next) => {
   try {
-    const { productId, size, quantity, notes = '' } = req.body;
+    const {
+      productId,
+      size,
+      quantity,
+      notes = '',
+      selectedAttributes = {},
+    } = req.body;
     const customerId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -47,13 +53,35 @@ exports.addToCart = async (req, res, next) => {
       error.statusCode = StatusCodes.NOT_FOUND;
       throw error;
     }
+    // Validate dropdown attributes
+    const attributeErrors = [];
+    product.attributes.forEach((attr) => {
+      const selectedValue = selectedAttributes[attr.name];
 
+      // Check required attributes
+      if (attr.required && !selectedValue) {
+        attributeErrors.push(`'${attr.name}' is required`);
+      }
+
+      // Validate selected option
+      if (selectedValue && !attr.options.includes(selectedValue)) {
+        attributeErrors.push(`Invalid selection for '${attr.name}'`);
+      }
+    });
+
+    if (attributeErrors.length > 0) {
+      const error = new Error('Attribute validation failed');
+      error.details = attributeErrors;
+      error.statusCode = StatusCodes.BAD_REQUEST;
+      throw error;
+    }
     // Check if the product is already in the cart
     const existingCartItem = customer.cart.find(
       (item) =>
         item.product?.toString() === productId &&
         +item.size === +size &&
         +item.price === +product.price &&
+        shallowEqual(item.selectedAttributes, selectedAttributes) &&
         item.notes === notes
     );
 
@@ -64,6 +92,7 @@ exports.addToCart = async (req, res, next) => {
       // Add the product to the cart
       customer.cart.push({
         product: productId,
+        selectedAttributes,
         price: product.price,
         size,
         quantity,
@@ -94,7 +123,7 @@ exports.addToCart = async (req, res, next) => {
 
     res.status(error.statusCode).json({
       success: false,
-      message: error.message,
+      message: error.message + ' ( ' + error.details + ' ) ',
       errorDetails:
         process.env.NODE_ENV === 'development'
           ? {
@@ -271,7 +300,7 @@ exports.getCart = async (req, res, next) => {
     const customer = await Customer.findById(customerId)
       .populate({
         path: 'cart.product',
-        select: 'title images productType',
+        select: 'title images productType ',
         populate: {
           path: 'productType',
           select: 'name parentProductType',
@@ -326,3 +355,7 @@ exports.getCart = async (req, res, next) => {
     });
   }
 };
+
+const shallowEqual = (obj1, obj2) =>
+  Object.keys(obj1).length === Object.keys(obj2).length &&
+  Object.keys(obj1).every((key) => obj1[key] === obj2[key]);

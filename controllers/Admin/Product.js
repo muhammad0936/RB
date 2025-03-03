@@ -23,7 +23,16 @@ exports.addProduct = async (req, res, next) => {
       logo = { url: '', publicId: '' }, // Default to empty object
       images = [], // Array of { url, publicId }
       videos = [], // Array of { url, publicId }
+      attributes,
     } = req.body;
+
+    if (attributes) {
+      attributes.forEach((attr) => {
+        if (!attr.name || !attr.options || attr.options.length === 0) {
+          throw new Error('Invalid attribute structure');
+        }
+      });
+    }
 
     // Validate 'productTypeId'
     if (!mongoose.Types.ObjectId.isValid(productTypeId)) {
@@ -78,6 +87,7 @@ exports.addProduct = async (req, res, next) => {
       images: normalizedImages, // Store images as [{ url, publicId }]
       videos: normalizedVideos, // Store videos as [{ url, publicId }]
       productType: productType._id, // Store only the ID
+      attributes: attributes || [],
     });
 
     // Save the product to the database
@@ -119,6 +129,7 @@ exports.editProduct = async (req, res, next) => {
 
     // **Store original state for comparison and cleanup**
     const originalState = {
+      attributes: [...product.attributes],
       logo: { ...product.logo }, // Store logo object
       images: [...product.images], // Store images array
       videos: [...product.videos], // Store videos array
@@ -188,6 +199,27 @@ exports.editProduct = async (req, res, next) => {
       });
 
       product.availableSizes = [...new Set(numericSizes)].sort((a, b) => a - b);
+    }
+
+    if (req.body.attributes !== undefined) {
+      // Validate attributes structure
+      if (!Array.isArray(req.body.attributes)) {
+        const error = new Error('Attributes must be an array');
+        error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
+        throw error;
+      }
+
+      req.body.attributes.forEach((attr) => {
+        if (!attr.name || !attr.options || attr.options.length === 0) {
+          const error = new Error(
+            'Each attribute must have name and non-empty options array'
+          );
+          error.statusCode = StatusCodes.UNPROCESSABLE_ENTITY;
+          throw error;
+        }
+      });
+
+      product.attributes = req.body.attributes;
     }
 
     // Logo
@@ -278,15 +310,16 @@ exports.editProduct = async (req, res, next) => {
       throw error;
     }
 
-    // **Update metadata**
     product.lastEditor = admin._id;
     product.updatedAt = Date.now();
 
-    // **Save updates**
     const updatedProduct = await product.save();
 
     // **Determine changes**
     const changes = {
+      attributes:
+        JSON.stringify(originalState.attributes) !==
+        JSON.stringify(updatedProduct.attributes),
       sizes:
         JSON.stringify(originalState.sizes) !==
         JSON.stringify(updatedProduct.availableSizes),
@@ -307,6 +340,8 @@ exports.editProduct = async (req, res, next) => {
       message: 'Product updated successfully',
       productId: updatedProduct._id,
       changes: {
+        attributesUpdated: changes.attributes,
+        attributeCount: updatedProduct.attributes.length,
         sizesUpdated: changes.sizes,
         imagesUpdated: changes.images,
         videosUpdated: changes.videos,
