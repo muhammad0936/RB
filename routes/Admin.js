@@ -42,13 +42,6 @@ const {
   resetPassword,
 } = require('../controllers/Admin/ResetPassword');
 const {
-  addToCartByAdmin,
-  createOrder,
-  removeFromCustomerCart,
-  getCustomerCart,
-  changeCartItemQuantity,
-} = require('../controllers/Admin/CustoemerOrder');
-const {
   createOffer,
   updateOffer,
   deleteOffer,
@@ -142,21 +135,6 @@ router.put('/operator/:id', multerGlobal, isAuth, editOperator);
 router.delete('/operator/:id', isAuth, deleteOperator);
 
 router.get('/operators', multerGlobal, isAuth, getOperators);
-
-router.post('/customerCart', multerGlobal, isAuth, addToCartByAdmin);
-
-router.delete('/customerCart', multerGlobal, isAuth, removeFromCustomerCart);
-
-router.delete(
-  '/customerChangeItemQuantity',
-  multerGlobal,
-  isAuth,
-  changeCartItemQuantity
-);
-
-router.get('/customerCart', multerGlobal, isAuth, getCustomerCart);
-
-router.post('/customerOrder', multerGlobal, isAuth, createOrder);
 
 router.post('/offer', multerGlobal, isAuth, createOffer);
 

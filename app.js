@@ -11,8 +11,6 @@ const cron = require('node-cron');
 const http = require('http');
 const bodyParser = require('body-parser');
 
-const unlink = require('./util/deleteFile');
-
 const AdminRoutes = require('./routes/Admin');
 const OperatorRoutes = require('./routes/Operator');
 const CustomerRoutes = require('./routes/Customer');
@@ -20,6 +18,7 @@ const CommonRoutes = require('./routes/Common');
 const PaymentRoutes = require('./routes/Payment');
 const CloudinaryRoutes = require('./routes/CloudinaryUploads');
 const AdminCart = require('./routes/AdminCart');
+const Statistics = require('./routes/Statistics');
 
 const connectToDatabase = require('./database/connection');
 
@@ -55,6 +54,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/admin', AdminRoutes);
+app.use('/admin', Statistics);
 app.use('/admin', CloudinaryRoutes);
 app.use('/admin', AdminCart);
 app.use('/operator', OperatorRoutes);
