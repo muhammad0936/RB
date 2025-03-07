@@ -52,6 +52,7 @@ const {
   manageProducts,
 } = require('../controllers/Admin/Offer');
 const { createBanner } = require('../controllers/Admin/Banner');
+const { addPopular, deletePopular, getPopulars } = require('../controllers/Admin/Popular');
 
 // router.post(
 //   '/upload/image',
@@ -152,6 +153,10 @@ router.delete('/offer/:id', multerGlobal, isAuth, deleteOffer);
 router.put('/manageOfferProducts/:id', multerGlobal, isAuth, manageProducts);
 
 router.post('/banner', multerGlobal, isAuth, createBanner);
+
+router.post('/popular', multerGlobal, isAuth, addPopular);
+
+router.delete('/popular/:id', multerGlobal, isAuth, deletePopular);
 
 
 module.exports = router;

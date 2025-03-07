@@ -76,7 +76,6 @@ const orderSchema = new Schema(
       },
       street: {
         type: String,
-        required: true,
       },
       subStreet: String,
       building: {

@@ -19,6 +19,7 @@ const { getOffers, getOneOffer } = require('../controllers/Common/Offer');
 const multerGlobal = require('../middlewares/multerGlobal');
 const { getOrderStatuses } = require('../controllers/Common/Order');
 const { getBanners } = require('../controllers/Common/Banner');
+const { getPopulars } = require('../controllers/Common/Popular');
 
 router.get('/parentProductTypes', getParentProductTypes);
 
@@ -45,4 +46,6 @@ router.get('/offers', multerGlobal, getOffers);
 router.get('/offer/:id', multerGlobal, getOneOffer);
 
 router.get('/banner', multerGlobal, getBanners);
+
+router.get('/populars', multerGlobal, getPopulars);
 module.exports = router;
