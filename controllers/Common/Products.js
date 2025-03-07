@@ -300,7 +300,7 @@ exports.getBestSellers = async (req, res, next) => {
         },
       },
       // 10. Optional: Exclude products missing details
-      // { $match: { name: { $exists: true } } },
+      { $match: { name: { $exists: true } } },
     ]);
 
     // If no best sellers found

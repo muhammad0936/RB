@@ -51,6 +51,7 @@ const {
   deleteOffer,
   manageProducts,
 } = require('../controllers/Admin/Offer');
+const { createBanner } = require('../controllers/Admin/Banner');
 
 // router.post(
 //   '/upload/image',
@@ -149,5 +150,8 @@ router.put('/offer/:id', multerGlobal, isAuth, updateOffer);
 router.delete('/offer/:id', multerGlobal, isAuth, deleteOffer);
 
 router.put('/manageOfferProducts/:id', multerGlobal, isAuth, manageProducts);
+
+router.post('/banner', multerGlobal, isAuth, createBanner);
+
 
 module.exports = router;
