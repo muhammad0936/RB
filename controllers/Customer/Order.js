@@ -554,3 +554,322 @@ exports.getOneOrder = async (req, res) => {
     });
   }
 };
+const fs = require('fs'); // Require Node's file system module.
+const path = require('path'); // Require Node's path module.
+const { PDFDocument, rgb } = require('pdf-lib');
+const fontkit = require('@pdf-lib/fontkit'); // Require fontkit
+exports.downloadOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Fetch order with populated products
+    const order = await Order.findById(orderId)
+      .populate('products.product')
+      .lean();
+
+    if (!order) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    // Create a PDF document.
+    const pdfDoc = await PDFDocument.create();
+    pdfDoc.registerFontkit(fontkit);
+
+    // Load custom fonts that support Arabic (full Unicode).
+    // Replace './fonts/NotoSans-Regular.ttf' and './fonts/NotoSans-Bold.ttf' with your font paths.
+    // const fontBytes = fs.readFileSync('C:\Users\hp\Desktop\Clothing Strore\fonts\Noto_Sans\static\NotoSans-Regular.ttf');
+    const fontPath = path.resolve(__dirname, '../../fonts/IBM_Plex_Sans_Arabic/IBMPlexSansArabic-Regular.ttf');
+    const fontBytes = fs.readFileSync(fontPath);
+    const arabicFont = await pdfDoc.embedFont(fontBytes, { subset: false }); // Disable subsetting
+
+    // Create bold variant if available
+    const fontBoldPath = path.resolve(__dirname, '../../fonts/IBM_Plex_Sans_Arabic/IBMPlexSansArabic-Bold.ttf');
+    const fontBoldBytes = fs.readFileSync(fontBoldPath);
+    const arabicFontBold = await pdfDoc.embedFont(fontBoldBytes, { subset: false });
+
+    // Create the first page.
+    let page = pdfDoc.addPage([600, 800]);
+    const pageWidth = page.getWidth(); // 600
+    const pageHeight = page.getHeight(); // 800
+    const leftMargin = 50;
+    const rightMargin = 50;
+    const lineHeight = 20;
+
+    // -------------------
+    // HEADER – Order Information
+    // -------------------
+    const headerY = pageHeight - 50;
+
+    // Order ID at top left in bold.
+    page.drawText(`Order ID: ${order._id}`, {
+      x: leftMargin,
+      y: headerY,
+      size: 16,
+      font: arabicFontBold,
+      color: rgb(0, 0, 0),
+    });
+
+    // Top right: Order Date, Total Amount, and Delivery Cost.
+    let rightY = headerY;
+    const orderDateText = `Order Date: ${new Date(
+      order.createdAt
+    ).toLocaleString()}`;
+    const dateTextWidth = arabicFont.widthOfTextAtSize(orderDateText, 12);
+    page.drawText(orderDateText, {
+      x: pageWidth - rightMargin - dateTextWidth,
+      y: rightY,
+      size: 12,
+      font: arabicFont,
+      color: rgb(0, 0, 0),
+    });
+    rightY -= lineHeight;
+
+    const totalText = `Total Amount: ${order.totalAmount}`;
+    const totalTextWidth = arabicFont.widthOfTextAtSize(totalText, 12);
+    page.drawText(totalText, {
+      x: pageWidth - rightMargin - totalTextWidth,
+      y: rightY,
+      size: 12,
+      font: arabicFont,
+      color: rgb(0, 0, 0),
+    });
+    rightY -= lineHeight;
+
+    const deliveryText = `Delivery Cost: ${order.deliveryCost}`;
+    const deliveryTextWidth = arabicFont.widthOfTextAtSize(deliveryText, 12);
+    page.drawText(deliveryText, {
+      x: pageWidth - rightMargin - deliveryTextWidth,
+      y: rightY,
+      size: 12,
+      font: arabicFont,
+      color: rgb(0, 0, 0),
+    });
+
+    // Initialize yPosition for content below the header.
+    let yPosition = headerY - 3 * lineHeight - 20;
+
+    // -------------------
+    // PRODUCTS SECTION
+    // -------------------
+    page.drawText('Products:', {
+      x: leftMargin,
+      y: yPosition,
+      size: 16,
+      font: arabicFontBold,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= lineHeight + 10;
+
+    // Helper function to add text using the current page context.
+    const addText = (text, size = 12, font = arabicFont) => {
+      page.drawText(text, {
+        x: leftMargin,
+        y: yPosition,
+        size,
+        font,
+        color: rgb(0, 0, 0),
+      });
+      yPosition -= lineHeight;
+    };
+
+    order.products.forEach((item, index) => {
+      // Add a new page if there is not enough space.
+      if (yPosition < 100) {
+        page = pdfDoc.addPage([600, 800]);
+        yPosition = page.getHeight() - 50;
+      }
+
+      // Product header label.
+      addText(`Product ${index + 1}:`, 14, arabicFontBold);
+
+      // First line: Title and Size.
+      addText(
+        `Title: ${item.product?.title || 'Product not available'}  |  Size: ${
+          item.size
+        }`
+      );
+
+      // Second line: Price and Quantity.
+      addText(`Price: ${item.price}  |  Quantity: ${item.quantity}`);
+
+      // Third line: Product Notes (if available).
+      // Display Selected Attributes dynamically (if available).
+      if (item.selectedAttributes) {
+        // Check if selectedAttributes is an Array.
+        if (
+          Array.isArray(item.selectedAttributes) &&
+          item.selectedAttributes.length > 0
+        ) {
+          item.selectedAttributes.forEach((attr) => {
+            addText(`${attr.name}: ${attr.value}`);
+          });
+        } else if (
+          typeof item.selectedAttributes === 'object' &&
+          Object.keys(item.selectedAttributes).length > 0
+        ) {
+          // If it's an object (obtained from a Map with lean()).
+          Object.entries(item.selectedAttributes).forEach(([key, value]) => {
+            addText(`${key}: ${value}`);
+          });
+        }
+      }
+      if (item.notes) {
+        const words = item.notes.split(' ');
+        let line = '';
+        let isFirstLine = true;
+        for (let i = 0; i < words.length; i++) {
+          line += words[i] + ' ';
+          if ((i + 1) % 14 === 0) {
+            if (isFirstLine) {
+              addText(`Notes: ${line.trim()}`,12,arabicFontBold);
+              isFirstLine = false;
+            } else {
+              addText(`${line.trim()}`,12,arabicFontBold);
+            }
+            line = '';
+          }
+        }
+        if (line.trim().length > 0) {
+          if (isFirstLine) {
+            addText(`Notes: ${line.trim()}`,12,arabicFontBold);
+          } else {
+            addText(`${line.trim()}`,12,arabicFontBold);
+          }
+        }}
+
+
+
+      // Extra space between products.
+      yPosition -= 10;
+    });
+
+    // -------------------
+    // FOOTER – Thank You Message.
+    // -------------------
+    if (yPosition < 200) {
+      page = pdfDoc.addPage([600, 800]);
+      yPosition = page.getHeight() - 50;
+    }
+
+    // -------------------
+    // ORDER NOTES BOX (Bottom Right) - Dynamic height based on note length.
+    // -------------------
+
+    if (order.notes) {
+      const boxWidth = 250;
+      const textPadding = 5;
+      const orderNotesFontSize = 16;
+      const noteLineHeight = orderNotesFontSize + 4; // approximate line height
+      const maxTextWidth = boxWidth - textPadding * 2;
+
+      // Helper function to wrap text into multiple lines.
+      function wrapText(text, font, fontSize, maxWidth) {
+        const words = text.split(' ');
+        const lines = [];
+        let currentLine = '';
+
+        words.forEach((word) => {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          const testLineWidth = font.widthOfTextAtSize(testLine, fontSize);
+          if (testLineWidth > maxWidth && currentLine !== '') {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = testLine;
+          }
+        });
+        if (currentLine) lines.push(currentLine);
+        return lines;
+      }
+
+      const lines = wrapText(
+        order.notes,
+        arabicFontBold,
+        orderNotesFontSize,
+        maxTextWidth
+      );
+      const boxHeight = lines.length * noteLineHeight + textPadding * 2;
+
+      // Ensure there is enough space on the page; otherwise, add a new page.
+      if (yPosition - boxHeight < 50) {
+        page = pdfDoc.addPage([600, 800]);
+        yPosition = page.getHeight() - 50;
+      }
+
+      const boxX = pageWidth - rightMargin - boxWidth;
+      const boxY = 50; // fixed bottom margin
+
+      page.drawRectangle({
+        x: boxX,
+        y: boxY,
+        width: boxWidth,
+        height: boxHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1,
+      });
+
+      let textY = boxY + boxHeight - textPadding - orderNotesFontSize;
+      lines.forEach((line) => {
+        page.drawText(line, {
+          x: boxX + textPadding,
+          y: textY,
+          size: orderNotesFontSize,
+          font: arabicFontBold,
+          color: rgb(0, 0, 0),
+        });
+        textY -= noteLineHeight;
+      });
+    }
+
+    // -------------------
+    // "PAID" Label (Bottom Left) - Show in green if the order is paid.
+    // -------------------
+    if (order.isPaid) {
+      page.drawText('PAID', {
+        x: leftMargin,
+        y: 52, // Adjust as necessary.
+        size: 18,
+        font: arabicFontBold,
+        color: rgb(0, 0.8, 0), // Green color.
+      });
+    }
+
+    // -------------------
+    // FINALIZE AND SEND THE PDF
+    // -------------------
+    const pdfBytes = await pdfDoc.save();
+    const pdfBuffer = Buffer.from(pdfBytes);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=order_${orderId}.pdf`
+    );
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to generate order PDF',
+    });
+  }
+};
+function insertNewlineAfterTenWords(input) {
+  // Split the input string by spaces
+  const words = input.split(' ');
+
+  // Create an array that will hold groups of 10 words
+  const lines = [];
+  
+  // Process words in chunks of 10
+  for (let i = 0; i < words.length; i += 10) {
+    // Slice out 10 words (or less if at the end) and join them into a single line
+    const line = words.slice(i, i + 10).join(' ');
+    lines.push(line);
+  }
+  
+  // Join all the lines with newline break and return
+  return lines.join('\n');}

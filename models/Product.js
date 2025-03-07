@@ -72,6 +72,10 @@ const productSchema = new Schema(
         },
       },
     ],
+    notes: {
+      type: String,
+      default : 'إذا كان القياس XL فأكثر الرجاء الكتابة في الملاحظات'
+    }
   },
   { timestamps: true }
 );

@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const { StatusCodes } = require('http-status-codes');
+const { PDFDocument, rgb } = require('pdf-lib');
 const Order = require('../../models/Order');
 const Product = require('../../models/Product');
+const Admin = require('../../models/Admin');
 const { OrderStatus } = require('../../util/types');
 const Customer = require('../../models/Customer');
 const { ensureIsAdmin } = require('../../util/ensureIsAdmin');
@@ -230,4 +232,176 @@ exports.getOneOrder = async (req, res) => {
       message: error.message || 'Failed to retrieve order details',
     });
   }
+};
+
+exports.updateOrderStatus = async (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+  const validStatuses = Object.values(OrderStatus).filter(
+    (s) => s !== 'Pending'
+  );
+  // Validate the order ID
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    return res.status(400).json({ message: 'Invalid order ID' });
+  }
+
+  // Validate the new status
+  if (!Object.values(validStatuses).includes(status)) {
+    return res.status(400).json({
+      message: 'Invalid status value',
+      validStatuses: Object.values(validStatuses), // Provide valid statuses for reference
+    });
+  }
+
+  try {
+    const admin = await ensureIsAdmin(req.userId);
+    if (!admin) {
+      const error = new Error('Unauthorized!');
+      error.statusCode = 401;
+      throw error;
+    }
+    // Find the order by ID and update its status
+    const updatedOrder = await Order.findByIdAndUpdate(
+      orderId,
+      { status },
+      { new: true } // Return the updated document
+    );
+
+    // If the order is not found
+    if (!updatedOrder) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Return the updated order
+    res.status(200).json({
+      message: 'Order status updated successfully',
+      order: {
+        id: updatedOrder._id,
+        status: updatedOrder.status,
+        totalAmount: updatedOrder.totalAmount,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating order status:', error);
+    res
+      .status(error.statusCode || 500)
+      .json({ message: error?.message || 'Internal Server Error' });
+  }
+};
+
+exports.downloadOrder = async (req, res) => {
+  const order = req.body.order;
+  const pdfDoc = await PDFDocument.create();
+
+  const page = pdfDoc.addPage([600, 400]);
+
+  // Adding title
+  page.drawText('Order Details', {
+    x: 50,
+    y: 350,
+    size: 20,
+    color: rgb(0, 0, 0),
+  });
+
+  // Adding order information
+  page.drawText(`Order ID: ${order.orderId}`, {
+    x: 50,
+    y: 320,
+    size: 12,
+    color: rgb(0, 0, 0),
+  });
+  page.drawText(`Order Date: ${new Date(order.orderDate).toLocaleString()}`, {
+    x: 50,
+    y: 300,
+    size: 12,
+    color: rgb(0, 0, 0),
+  });
+  page.drawText(`Final Cost: ${order.finalCost}`, {
+    x: 50,
+    y: 280,
+    size: 12,
+    color: rgb(0, 0, 0),
+  });
+  page.drawText(`Delivery Cost: ${order.deliveryCost}`, {
+    x: 50,
+    y: 260,
+    size: 12,
+    color: rgb(0, 0, 0),
+  });
+  page.drawText(`Order Notes: ${order.orderNotes}`, {
+    x: 50,
+    y: 240,
+    size: 12,
+    color: rgb(0, 0, 0),
+  });
+
+  // Adding products
+  let yPosition = 220;
+  order.products.forEach((product, index) => {
+    page.drawText(`Product ${index + 1}:`, {
+      x: 50,
+      y: yPosition,
+      size: 14,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 20;
+    page.drawText(`Title: ${product.title}`, {
+      x: 50,
+      y: yPosition,
+      size: 12,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 20;
+    page.drawText(`Quantity: ${product.quantity}`, {
+      x: 50,
+      y: yPosition,
+      size: 12,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 20;
+    page.drawText(`Price: ${product.price}`, {
+      x: 50,
+      y: yPosition,
+      size: 12,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 20;
+    page.drawText(`Size: ${product.size}`, {
+      x: 50,
+      y: yPosition,
+      size: 12,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 20;
+    page.drawText(
+      `Color: ${
+        product.selectedAttributes.find((attr) => attr.name === 'color').value
+      }`,
+      {
+        x: 50,
+        y: yPosition,
+        size: 12,
+        color: rgb(0, 0, 0),
+      }
+    );
+    yPosition -= 20;
+    page.drawText(`Notes: ${product.notes}`, {
+      x: 50,
+      y: yPosition,
+      size: 12,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 40;
+  });
+
+  // Save the PDF to a buffer
+  const pdfBytes = await pdfDoc.save();
+
+  // Set the response headers to download the PDF
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    'attachment; filename=order_details.pdf'
+  );
+  res.send(pdfBytes);
 };

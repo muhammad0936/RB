@@ -24,6 +24,7 @@ exports.addProduct = async (req, res, next) => {
       images = [], // Array of { url, publicId }
       videos = [], // Array of { url, publicId }
       attributes,
+      notes
     } = req.body;
 
     if (attributes) {
@@ -88,6 +89,7 @@ exports.addProduct = async (req, res, next) => {
       videos: normalizedVideos, // Store videos as [{ url, publicId }]
       productType: productType._id, // Store only the ID
       attributes: attributes || [],
+      notes
     });
 
     // Save the product to the database

@@ -30,7 +30,11 @@ const {
   getCoupons,
   addCoupon,
 } = require('../controllers/Admin/Coupon');
-const { getOrders, getOneOrder } = require('../controllers/Admin/Order');
+const {
+  getOrders,
+  getOneOrder,
+  updateOrderStatus,
+} = require('../controllers/Admin/Order');
 const {
   addOperator,
   deleteOperator,
@@ -125,6 +129,8 @@ router.get('/coupons', multerGlobal, isAuth, getCoupons);
 router.get('/orders', multerGlobal, isAuth, getOrders);
 
 router.get('/orders/:orderId', isAuth, multerGlobal, getOneOrder);
+
+router.put('/order/:orderId', multerGlobal, isAuth, updateOrderStatus);
 
 router.get('/customers', multerGlobal, isAuth, getCustomers);
 

@@ -168,9 +168,7 @@ exports.getOneProduct = async (req, res, next) => {
     }
 
     const product = await Product.findById(productId)
-      .select(
-        '_id title description price weight availableSizes logo images videos productType creator lastEditor createdAt updatedAt attributes'
-      )
+    .select('-weight -creator -lastEditor -updatedAt -__v')
       .populate({
         path: 'productType',
         select: 'name parentProductType',
@@ -197,12 +195,16 @@ exports.getOneProduct = async (req, res, next) => {
       success: true,
       data: product,
       productTypeDetails: {
-        productType: product.productType,
-        parentProductType: product.productType.parentProductType,
+        productType: product?.productType,
+        parentProductType: product?.productType?.parentProductType,
       },
     });
   } catch (error) {
-    // ... (keep existing error handling)
+    console.error('Error fetching product:', error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to fetch product',
+    });
   }
 };
 exports.getBestSellers = async (req, res, next) => {

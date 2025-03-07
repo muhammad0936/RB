@@ -15,6 +15,7 @@ const {
   getOneOrder,
   checkout,
   createOrder,
+  downloadOrder,
 } = require('../controllers/Customer/Order');
 const {
   requestPasswordReset,
@@ -60,6 +61,8 @@ router.post(
 router.get('/orders', isAuth, multerGlobal, getOrders);
 
 router.get('/orders/:orderId', isAuth, multerGlobal, getOneOrder);
+
+router.get('/downloadOrder/:orderId', multerGlobal, downloadOrder);
 
 router.post('/offerCart', multerGlobal, isAuth, addOfferToCart);
 
