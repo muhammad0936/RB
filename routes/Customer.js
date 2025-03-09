@@ -47,7 +47,7 @@ router.delete(
 
 router.get('/cart', isAuth, getCart);
 
-router.get('/checkout', multerGlobal, isAuth, checkout);
+router.post('/checkout', multerGlobal, isAuth, checkout);
 
 router.post('/order', multerGlobal, isAuth, createOrder);
 
