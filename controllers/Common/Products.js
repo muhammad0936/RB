@@ -168,7 +168,7 @@ exports.getOneProduct = async (req, res, next) => {
     }
 
     const product = await Product.findById(productId)
-    .select('-weight -creator -lastEditor -updatedAt -__v')
+      .select(' -creator -lastEditor -updatedAt -__v')
       .populate({
         path: 'productType',
         select: 'name parentProductType',
